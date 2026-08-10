@@ -281,6 +281,9 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#eceff1;color:#1a1a1
     <button class="btn" onclick="modificaTessera()">✏️ Modifica</button>
     <button class="btn btn-d" onclick="eliminaTessera()">🗑️ Elimina</button>
   </div>
+  <div class="btn-row" style="justify-content:center;margin-top:10px">
+    <button class="btn" onclick="goBack()" style="min-width:200px">← Torna indietro</button>
+  </div>
 </div>
 
 <!-- ═══ IMPOSTAZIONI ═══ -->
@@ -328,7 +331,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#eceff1;color:#1a1a1
 <div id="toast"></div>
 
 <script>
-var APP_VERSION = 'v19';
+var APP_VERSION = 'v20';
 var DB_KEY = 'tf_db_v1';
 var MESI = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
 
@@ -1127,11 +1130,21 @@ function modificaTessera(){
   vai('inserisci');
 }
 function eliminaTessera(){
-  if(!confirm('Eliminare questa tessera? Irreversibile.')) return;
-  var d = db().filter(function(x){ return x.id !== currentDettaglioId; });
-  saveDb(d);
-  toast('Tessera eliminata');
-  goHome();
+  var t = db().find(function(x){ return x.id === currentDettaglioId; });
+  var nomeT = t ? t.nome : '';
+  mostraConferma({
+    icona: '🗑️',
+    titolo: 'Eliminare questa tessera?',
+    testo: 'La tessera' + (nomeT ? ' di <b>' + esc(nomeT) + '</b>' : '') + ', comprese le foto salvate, verrà eliminata definitivamente. Questa azione non può essere annullata.',
+    okTesto: 'Elimina',
+    okClasse: 'btn-d'
+  }, function(ok){
+    if(!ok) return;
+    var d = db().filter(function(x){ return x.id !== currentDettaglioId; });
+    saveDb(d);
+    toast('Tessera eliminata');
+    goHome();
+  });
 }
 
 // ── IMPOSTAZIONI ──
@@ -1170,13 +1183,20 @@ function importa(){
   else if(Array.isArray(parsed)) tessere = parsed;
 
   if(!tessere){ toast('⚠ Formato file non riconosciuto'); return; }
-  if(!confirm('Ripristinare il backup?\n\nQuesto SOSTITUISCE le tessere attuali con quelle del file ('+tessere.length+').')) return;
-
-  saveDb(tessere);
-  annullaImport();
-  toast('✓ Backup ripristinato ('+tessere.length+' tessere)');
-  aggiornaHome();
-  initImpostazioni();
+  mostraConferma({
+    icona: '📥',
+    titolo: 'Ripristinare il backup?',
+    testo: 'Le <b>' + tessere.length + ' tessere</b> presenti nel file sostituiranno tutte quelle attualmente salvate nell\'app. Le tessere attuali verranno perse se non le hai esportate prima.',
+    okTesto: 'Ripristina',
+    okClasse: 'btn-p'
+  }, function(ok){
+    if(!ok) return;
+    saveDb(tessere);
+    annullaImport();
+    toast('✓ Backup ripristinato ('+tessere.length+' tessere)');
+    aggiornaHome();
+    initImpostazioni();
+  });
 }
 function esporta(){
   var backup = {
@@ -1192,11 +1212,19 @@ function esporta(){
   a.click();
 }
 function svuota(){
-  if(!confirm('Eliminare TUTTE le tessere? Irreversibile.')) return;
-  localStorage.removeItem(DB_KEY);
-  toast('Archivio svuotato');
-  aggiornaHome();
-  initImpostazioni();
+  mostraConferma({
+    icona: '🗑️',
+    titolo: 'Svuotare tutto l\'archivio?',
+    testo: 'Tutte le tessere salvate, comprese le foto, verranno eliminate definitivamente. Questa azione non può essere annullata.',
+    okTesto: 'Svuota tutto',
+    okClasse: 'btn-d'
+  }, function(ok){
+    if(!ok) return;
+    localStorage.removeItem(DB_KEY);
+    toast('Archivio svuotato');
+    aggiornaHome();
+    initImpostazioni();
+  });
 }
 
 // ── UTILS ──
@@ -1211,6 +1239,7 @@ function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').repla
 
 // ── ABOUT / CRONOLOGIA ──
 var CHANGELOG = [
+  { v:'v20', data:'2026-08-10', voci:['I messaggi di conferma (elimina tessera, svuota archivio, ripristina backup) non usano più il popup grigio nativo del browser: ora è un riquadro personalizzato, in stile app, con icona, titolo e descrizione più chiara di cosa sta per succedere.','Nella schermata della tessera, sotto i tasti "Modifica" ed "Elimina", aggiunto un tasto "Torna indietro" centrato, per tornare alla schermata precedente senza dover usare il tasto in alto.'] },
   { v:'v19', data:'2026-08-10', voci:['Pulsanti "Rileva codice a barre" e "Rileva anche nome e numero" ridisegnati: più grandi, a tutta larghezza e colorati, per essere subito riconoscibili.','Prima scansione ancora più automatica: appena si carica la foto del fronte, parte subito un tentativo lampo di lettura del codice a barre (senza aspettare l\'immagine ad alta risoluzione), seguito dalla scansione completa già presente.'] },
   { v:'v18', data:'2026-08-10', voci:['La nota ora compare anche nella griglia "Le mie tessere", sotto il nome del negozio — utile per distinguere due tessere dello stesso negozio (es. "Conad - Mamma" / "Conad - Casa").','Nella schermata della tessera, la nota è ora dentro l\'intestazione colorata, ben visibile subito sotto il nome, invece di un testo grigio anonimo più in basso.'] },
   { v:'v17', data:'2026-08-10', voci:['Corretto: i codici a barre in formato UPC-A (12 cifre) venivano letti senza lo "0" iniziale che viene stampato per convenzione sulla tessera (quello zero non fa parte delle barre vere e proprie). Ora viene riaggiunto automaticamente.'] },
@@ -1244,6 +1273,26 @@ function showAbout(){
   document.getElementById('aboutWrap').classList.add('open');
 }
 function closeAbout(){ document.getElementById('aboutWrap').classList.remove('open'); }
+
+// ── MODALE DI CONFERMA (sostituisce il confirm() nativo del browser, poco
+// personalizzabile e fuori stile rispetto al resto dell'app) ──
+var _confermaCb = null;
+function mostraConferma(opts, cb){
+  document.getElementById('confermaIcona').textContent = opts.icona || '⚠️';
+  document.getElementById('confermaTitolo').textContent = opts.titolo || 'Conferma';
+  document.getElementById('confermaTesto').innerHTML = opts.testo || '';
+  var okBtn = document.getElementById('confermaOkBtn');
+  okBtn.textContent = opts.okTesto || 'Conferma';
+  okBtn.className = 'btn ' + (opts.okClasse || 'btn-d');
+  _confermaCb = cb || null;
+  document.getElementById('confermaWrap').classList.add('open');
+}
+function chiudiConferma(esito){
+  document.getElementById('confermaWrap').classList.remove('open');
+  var cb = _confermaCb;
+  _confermaCb = null;
+  if(cb) cb(esito);
+}
 
 // ── INIT ──
 aggiornaHome();
@@ -1291,6 +1340,29 @@ if ('serviceWorker' in navigator) {
 </style>
 <div class="about-wrap" id="aboutWrap" onclick="if(event.target===this)closeAbout()">
   <div class="about-box" id="aboutBox"></div>
+</div>
+
+<!-- ═══ MODALE DI CONFERMA (personalizzato, stile app, sostituisce il confirm() nativo) ═══ -->
+<style>
+.conferma-wrap{position:fixed;inset:0;background:rgba(10,12,14,.55);display:none;align-items:center;justify-content:center;z-index:170;padding:20px;}
+.conferma-wrap.open{display:flex;}
+.conferma-box{background:#fff;border:1px solid #d3d1c7;border-radius:16px;width:100%;max-width:380px;padding:26px 24px 22px;box-shadow:0 20px 50px rgba(0,0,0,.28);text-align:center;animation:aboutIn .2s ease;}
+.conferma-icona{font-size:34px;margin-bottom:10px;}
+.conferma-titolo{font-size:16.5px;font-weight:700;color:#1a1a18;margin-bottom:8px;}
+.conferma-testo{font-size:13.5px;color:#6b6a63;line-height:1.5;margin-bottom:20px;}
+.conferma-btns{display:flex;gap:10px;}
+.conferma-btns .btn{flex:1;padding:11px 10px;}
+</style>
+<div class="conferma-wrap" id="confermaWrap" onclick="if(event.target===this)chiudiConferma(false)">
+  <div class="conferma-box">
+    <div class="conferma-icona" id="confermaIcona">⚠️</div>
+    <div class="conferma-titolo" id="confermaTitolo"></div>
+    <div class="conferma-testo" id="confermaTesto"></div>
+    <div class="conferma-btns">
+      <button class="btn" onclick="chiudiConferma(false)">Annulla</button>
+      <button class="btn btn-d" id="confermaOkBtn" onclick="chiudiConferma(true)">Conferma</button>
+    </div>
+  </div>
 </div>
 
 </body>
