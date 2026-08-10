@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="description" content="App per gestire le tessere fedeltà dei supermercati">
+<meta name="theme-color" content="#1a1a18">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Tessere">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/svg+xml" href="logo.svg">
+<link rel="apple-touch-icon" href="logo.svg">
+<title>Tessere Fedeltà</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:#eceff1;color:#1a1a18;min-height:100vh;padding-bottom:50px;}
+.credits{position:fixed;bottom:12px;right:16px;font-size:11px;color:#90a4ae;font-family:monospace;z-index:1000;background:rgba(236,239,241,0.85);padding:4px 10px;border-radius:20px;backdrop-filter:blur(4px);}
+.hdr{background:#1a1a18;color:#f5f4f0;padding:16px 20px;display:flex;align-items:center;gap:12px;}
+.hdr-back{background:rgba(255,255,255,0.12);border:none;color:#f5f4f0;font-size:15px;font-weight:600;cursor:pointer;padding:8px 12px;line-height:1;display:none;border-radius:10px;transition:background .15s;align-items:center;gap:6px;}
+.hdr-back:active{background:rgba(255,255,255,0.25);}
+.hdr-back.show{display:flex;}
+.fab-back{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1a1a18;color:#f5f4f0;border:none;border-radius:50px;padding:14px 28px;font-size:15px;font-weight:600;font-family:inherit;cursor:pointer;display:none;align-items:center;gap:8px;box-shadow:0 4px 20px rgba(0,0,0,0.35);z-index:999;transition:background .15s;white-space:nowrap;}
+.fab-back:active{background:#333;}
+.fab-back.show{display:flex;}
+.hdr-title{font-size:17px;font-weight:600;flex:1;}
+.hdr-sub{font-size:12px;color:#888780;}
+.scr{display:none;max-width:640px;margin:0 auto;padding:28px 16px;}
+.scr.on{display:block;animation:scrFade .42s cubic-bezier(.22,.61,.36,1);}
+@keyframes scrFade{from{opacity:0;transform:scale(.965);}to{opacity:1;transform:scale(1);}}
+@media (prefers-reduced-motion: reduce){.scr.on{animation:none;}}
+
+/* HOME */
+.home-info{text-align:center;margin-bottom:36px;padding-top:4px;}
+.home-day{font-size:14px;color:#5f5e5a;margin-bottom:6px;}
+.home-sum{font-size:13px;color:#888780;line-height:1.8;}
+.home-sum b{color:#1a1a18;}
+.cards{display:flex;flex-direction:column;gap:12px;}
+.card{background:#fff;border:1px solid #d3d1c7;border-radius:14px;padding:20px 22px;display:flex;align-items:center;gap:16px;cursor:pointer;width:100%;font-family:inherit;text-align:left;transition:border-color .15s,background .15s;}
+.card:hover{border-color:#888;background:#fafaf8;}
+.card-ico{width:46px;height:46px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;}
+.ico-g{background:#eaf3de;}.ico-b{background:#e6f1fb;}.ico-gr{background:#f1efe8;}.ico-n{background:#fce4d6;}.ico-p{background:#d4e6f1;}.ico-v{background:#ede6f5;}
+.card-lbl{flex:1;}
+.card-title{font-size:15px;font-weight:600;color:#1a1a18;margin-bottom:3px;}
+.card-desc{font-size:12px;color:#888780;}
+.card-arr{font-size:20px;color:#ccc;}
+
+/* PANEL */
+.panel{background:#fff;border:1px solid #d3d1c7;border-radius:12px;overflow:hidden;margin-bottom:18px;}
+.ph{padding:14px 18px;border-bottom:1px solid #eee;display:flex;align-items:center;justify-content:space-between;}
+.ph h2{font-size:14px;font-weight:600;}
+.pb{padding:18px;}
+
+/* FORM */
+.fg{display:flex;flex-direction:column;gap:5px;margin-bottom:13px;}
+.fg label{font-size:12px;color:#5f5e5a;font-weight:500;}
+.fg input,.fg select,.fg textarea{padding:10px 12px;border:1px solid #d3d1c7;border-radius:8px;font-size:14px;color:#1a1a18;background:#fff;outline:none;font-family:inherit;width:100%;transition:border-color .15s;}
+.fg input:focus,.fg select:focus,.fg textarea:focus{border-color:#888;}
+.sec-lbl{font-size:11px;font-weight:600;color:#5f5e5a;text-transform:uppercase;letter-spacing:.5px;padding-bottom:8px;border-bottom:1px solid #eee;margin-bottom:10px;margin-top:14px;}
+
+/* BUTTONS */
+.btn{padding:10px 20px;border-radius:8px;border:1px solid #d3d1c7;font-size:14px;font-weight:500;cursor:pointer;font-family:inherit;background:#fff;color:#1a1a18;transition:all .15s;}
+.btn:hover{background:#f5f4f0;}
+.btn-p{background:#1a1a18;color:#f5f4f0;border-color:#1a1a18;}
+.btn-p:hover{background:#333;}
+.btn-d{color:#a32d2d;border-color:#f09595;}
+.btn-d:hover{background:#fcebeb;}
+.btn-s{padding:7px 14px;font-size:12px;}
+.btn-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;}
+.btn-block{display:block;width:100%;text-align:center;}
+
+/* SETTINGS */
+.set-row{display:flex;align-items:center;justify-content:space-between;padding:13px 0;border-bottom:1px solid #f0efeb;gap:10px;}
+.set-row:last-child{border-bottom:none;}
+.set-info{flex:1;min-width:0;}
+.set-info h3{font-size:14px;font-weight:600;margin-bottom:2px;}
+.set-info p{font-size:12px;color:#888;}
+
+/* SEARCH */
+.search-box{margin-bottom:16px;}
+.search-box input{padding:12px 14px;border:1px solid #d3d1c7;border-radius:10px;font-size:14px;width:100%;background:#fff;font-family:inherit;outline:none;}
+.search-box input:focus{border-color:#888;}
+
+/* STORE GRID (Le mie tessere) */
+.store-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:14px;}
+.store-tile{background:#fff;border:1px solid #d3d1c7;border-radius:14px;padding:14px 8px 10px;display:flex;flex-direction:column;align-items:center;gap:8px;cursor:pointer;font-family:inherit;transition:border-color .15s,transform .1s;}
+.store-tile:hover{border-color:#888;}
+.store-tile:active{transform:scale(.96);}
+.store-avatar{width:52px;height:52px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:19px;font-weight:700;color:#fff;flex-shrink:0;overflow:hidden;}
+.store-avatar img{width:100%;height:100%;object-fit:cover;}
+.store-tile-name{font-size:11.5px;font-weight:600;color:#1a1a18;text-align:center;line-height:1.25;max-width:100%;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}
+.empty-state{text-align:center;padding:50px 20px;color:#888780;}
+.empty-state .es-ico{font-size:44px;margin-bottom:14px;}
+.empty-state .es-t{font-size:15px;font-weight:600;color:#1a1a18;margin-bottom:6px;}
+.empty-state .es-d{font-size:13px;}
+
+/* COLOR SWATCHES */
+.swatch-row{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:4px;}
+.swatch{width:34px;height:34px;border-radius:50%;cursor:pointer;border:2px solid transparent;display:flex;align-items:center;justify-content:center;font-size:15px;color:#fff;transition:border-color .15s,transform .1s;}
+.swatch.sel{border-color:#1a1a18;transform:scale(1.12);}
+
+/* PHOTO CAPTURE */
+.foto-wrap{border:1.5px dashed #d3d1c7;border-radius:12px;padding:18px;text-align:center;cursor:pointer;transition:border-color .15s;background:#fafaf9;}
+.foto-wrap:hover{border-color:#888;}
+.foto-wrap .fw-ico{font-size:28px;margin-bottom:6px;}
+.foto-wrap .fw-t{font-size:13px;color:#5f5e5a;font-weight:500;}
+.foto-preview-wrap{position:relative;border-radius:12px;overflow:hidden;border:1px solid #d3d1c7;}
+.foto-preview-wrap img{width:100%;display:block;max-height:280px;object-fit:contain;background:#f1efe8;}
+.foto-remove{position:absolute;top:8px;right:8px;background:rgba(26,26,24,0.75);color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+
+/* DETTAGLIO TESSERA */
+.det-head{display:flex;flex-direction:column;align-items:center;text-align:center;margin-bottom:22px;}
+.det-avatar{width:74px;height:74px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:700;color:#fff;margin-bottom:12px;overflow:hidden;}
+.det-avatar img{width:100%;height:100%;object-fit:cover;}
+.det-nome{font-size:19px;font-weight:700;}
+.det-note{font-size:13px;color:#888780;margin-top:4px;}
+.det-photo{width:100%;border-radius:14px;border:1px solid #d3d1c7;overflow:hidden;margin-bottom:18px;background:#fff;}
+.det-photo img{width:100%;display:block;}
+.det-noimg{padding:60px 20px;text-align:center;color:#888780;font-size:13px;}
+
+.datalist-none{list-style:none;}
+
+@media (max-width:480px){
+  .hdr{padding:14px 16px;}
+  .scr{padding:20px 12px;}
+}
+</style>
+</head>
+<body>
+
+<div class="credits" onclick="showAbout()" style="cursor:pointer">TR/software <span id="creditsVersione" style="opacity:.6"></span></div>
+
+<div class="hdr">
+  <button class="hdr-back" id="btnBack" onclick="goBack()">&#8592; Indietro</button>
+  <span class="hdr-title" id="hdrTitle">Tessere Fedeltà</span>
+  <span class="hdr-sub" id="hdrSub"></span>
+</div>
+
+<!-- ═══ HOME ═══ -->
+<div class="scr on" id="scrHome">
+  <div class="home-info">
+    <div class="home-day" id="homeDay"></div>
+    <div class="home-sum" id="homeSum"></div>
+  </div>
+  <div class="cards">
+    <button class="card" onclick="vai('inserisci')">
+      <div class="card-ico ico-g">📷</div>
+      <div class="card-lbl"><div class="card-title">Inserisci</div><div class="card-desc">Aggiungi una nuova tessera con una foto</div></div>
+      <span class="card-arr">›</span>
+    </button>
+    <button class="card" onclick="vai('tessere')">
+      <div class="card-ico ico-b">🪪</div>
+      <div class="card-lbl"><div class="card-title">Le mie tessere</div><div class="card-desc">Sfoglia e apri le tue tessere fedeltà</div></div>
+      <span class="card-arr">›</span>
+    </button>
+    <button class="card" onclick="vai('impostazioni')">
+      <div class="card-ico ico-gr">⚙️</div>
+      <div class="card-lbl"><div class="card-title">Impostazioni</div><div class="card-desc">Backup, importa ed esporta i dati</div></div>
+      <span class="card-arr">›</span>
+    </button>
+  </div>
+</div>
+
+<!-- ═══ INSERISCI ═══ -->
+<div class="scr" id="scrInserisci">
+  <div class="panel">
+    <div class="ph"><h2>Nuova tessera</h2></div>
+    <div class="pb">
+      <div class="fg">
+        <label>Nome negozio</label>
+        <input type="text" id="fNome" list="storeList" placeholder="es. Esselunga, Conad, Coop..." oninput="onNomeInput()" autocomplete="off">
+        <datalist id="storeList"></datalist>
+      </div>
+
+      <div class="fg">
+        <label>Colore etichetta</label>
+        <div class="swatch-row" id="swatchRow"></div>
+      </div>
+
+      <div class="sec-lbl">Foto tessera</div>
+      <div id="fotoArea">
+        <label class="foto-wrap" for="fFoto" id="fotoWrapLbl">
+          <div class="fw-ico">📷</div>
+          <div class="fw-t">Scatta o carica una foto della tessera</div>
+        </label>
+        <input type="file" id="fFoto" accept="image/*" capture="environment" style="display:none" onchange="onFotoChange(event)">
+      </div>
+
+      <div class="fg" style="margin-top:14px">
+        <label>Note (opzionale)</label>
+        <input type="text" id="fNote" placeholder="es. numero tessera, codice a barre...">
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-p" onclick="salvaTessera()">Salva tessera</button>
+        <button class="btn" onclick="resetForm()">Cancella</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ LE MIE TESSERE ═══ -->
+<div class="scr" id="scrTessere">
+  <div class="search-box">
+    <input type="text" id="searchTessere" placeholder="🔍 Cerca negozio..." oninput="renderTessere()">
+  </div>
+  <div id="tessereGrid"></div>
+</div>
+
+<!-- ═══ DETTAGLIO TESSERA ═══ -->
+<div class="scr" id="scrDettaglio">
+  <div class="det-head">
+    <div class="det-avatar" id="detAvatar"></div>
+    <div class="det-nome" id="detNome"></div>
+    <div class="det-note" id="detNote"></div>
+  </div>
+  <div class="det-photo" id="detPhotoWrap"></div>
+  <div class="btn-row" style="justify-content:center">
+    <button class="btn" onclick="modificaTessera()">✏️ Modifica</button>
+    <button class="btn btn-d" onclick="eliminaTessera()">🗑️ Elimina</button>
+  </div>
+</div>
+
+<!-- ═══ IMPOSTAZIONI ═══ -->
+<div class="scr" id="scrImpostazioni">
+  <div class="panel">
+    <div class="ph"><h2>Dati</h2></div>
+    <div class="pb">
+      <div class="set-row">
+        <div class="set-info"><h3>Esporta backup</h3><p>Scarica tutte le tessere (con foto) in un file JSON</p></div>
+        <button class="btn btn-s" onclick="esporta()">📥 Esporta</button>
+      </div>
+      <div class="set-row">
+        <div class="set-info"><h3>Importa backup</h3><p>Ripristina da un file .json esportato</p></div>
+        <label for="fileInput" class="btn btn-s" style="cursor:pointer;display:inline-block;">📂 Scegli file</label>
+      </div>
+      <input type="file" id="fileInput" accept=".json,application/json" style="display:none;" onchange="leggiFile(this)">
+      <div id="importArea" style="display:none;margin-top:14px;">
+        <div style="background:#f1efe8;border-radius:8px;padding:12px 14px;font-size:13px;color:#5f5e5a;margin-bottom:12px;">
+          📄 File: <strong id="fileLabel">—</strong>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-p btn-s" onclick="importa()">✓ Conferma importazione</button>
+          <button class="btn btn-s" onclick="annullaImport()">Annulla</button>
+        </div>
+      </div>
+      <div class="set-row">
+        <div class="set-info"><h3>Svuota archivio</h3><p>Elimina tutte le tessere — irreversibile</p></div>
+        <button class="btn btn-s btn-d" onclick="svuota()">Svuota</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="ph"><h2>Info</h2></div>
+    <div class="pb" style="font-size:13px;color:#888;line-height:1.9;">
+      <p id="infoCount" style="font-weight:600;color:#1a1a18;margin-bottom:4px;"></p>
+      <p id="infoVersione" style="color:#888;"></p>
+      <p>I dati sono salvati nel browser (localStorage), incluse le foto.</p>
+      <p>Esporta regolarmente il JSON come backup.</p>
+      <button class="btn btn-s" onclick="showAbout()" style="margin-top:8px">ℹ️ Cronologia versioni</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+var APP_VERSION = 'v1';
+var DB_KEY = 'tf_db_v1';
+var MESI = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
+
+// ── PALETTE ──
+var PALETTE = ['#e53935','#8e24aa','#3949ab','#1e88e5','#00897b','#43a047','#fb8c00','#6d4c41','#546e7a','#d81b60','#00acc1','#c0ca33'];
+
+// ── CATENE SUPERMERCATI NOTE (nome → colore) ──
+var STORE_PRESETS = {
+  'esselunga':'#e2001a','coop':'#c8102e','conad':'#0033a0','carrefour':'#00549f',
+  'lidl':'#0050aa','eurospin':'#f39200','pam':'#e4032e','despar':'#00953b',
+  'iper':'#ff6600','auchan':'#e2001a','md':'#0066b3','todis':'#f7a600',
+  'famila':'#004b93','crai':'#00a651','bennet':'#004b8d','tigros':'#005baa',
+  'in\'s':'#e30613','ins':'#e30613','simply':'#8dc63f','a&o':'#004b93',
+  'basko':'#0066b3','ipercoop':'#c8102e','penny':'#c8102e','pennymarket':'#c8102e',
+  'gigante':'#e30613','decò':'#0066b3','sisa':'#e30613','sigma':'#0066b3'
+};
+var STORE_NAMES = ['Esselunga','Coop','Conad','Carrefour','Lidl','Eurospin','Pam','Despar','Iper','Auchan','MD','Todis','Famila','Crai','Bennet','Tigros',"In's",'Simply','Basko','Ipercoop','Penny Market','Sisa','Sigma'];
+
+function hashColor(str){
+  var h=0;
+  for(var i=0;i<str.length;i++){ h = str.charCodeAt(i) + ((h<<5)-h); }
+  return PALETTE[Math.abs(h)%PALETTE.length];
+}
+function coloreFor(nome){
+  var k = (nome||'').trim().toLowerCase();
+  if(STORE_PRESETS[k]) return STORE_PRESETS[k];
+  return hashColor(k||'?');
+}
+function inizialiFrom(nome){
+  var parts = (nome||'').trim().split(/\s+/).filter(Boolean);
+  if(!parts.length) return '?';
+  if(parts.length===1) return parts[0].substring(0,2).toUpperCase();
+  return (parts[0][0]+parts[1][0]).toUpperCase();
+}
+
+// ── STORAGE ──
+function db() { try { var d = localStorage.getItem(DB_KEY); return d ? JSON.parse(d) : []; } catch(e) { return []; } }
+function saveDb(d) { localStorage.setItem(DB_KEY, JSON.stringify(d)); }
+function uid(){ return 't_' + Date.now() + '_' + Math.random().toString(36).slice(2,8); }
+
+// ── NAVIGATION ──
+var TITLES = { inserisci:'Nuova tessera', tessere:'Le mie tessere', dettaglio:'Tessera', impostazioni:'Impostazioni' };
+var SCREENS = { home:'scrHome', inserisci:'scrInserisci', tessere:'scrTessere', dettaglio:'scrDettaglio', impostazioni:'scrImpostazioni' };
+var navStack = [];
+var editingId = null;
+var currentDettaglioId = null;
+
+function vai(name, skipStack) {
+  if(!skipStack) {
+    var current = '';
+    Object.keys(SCREENS).forEach(function(k){ if(document.getElementById(SCREENS[k]).classList.contains('on')) current = k; });
+    if(current && current !== name) navStack.push(current);
+    if(navStack.length > 10) navStack.shift();
+  }
+  Object.keys(SCREENS).forEach(function(k){ document.getElementById(SCREENS[k]).classList.remove('on'); });
+  document.getElementById(SCREENS[name]).classList.add('on');
+  window.scrollTo(0, 0);
+  document.getElementById('hdrTitle').textContent = TITLES[name] || 'Tessere Fedeltà';
+  var isHome = name === 'home';
+  document.getElementById('btnBack').classList.toggle('show', !isHome);
+  document.body.style.paddingBottom = isHome ? '50px' : '50px';
+  if(name === 'home') aggiornaHome();
+  if(name === 'inserisci' && editingId === null) resetForm();
+  if(name === 'tessere') renderTessere();
+  if(name === 'impostazioni') initImpostazioni();
+}
+function goBack() {
+  editingId = null;
+  if(navStack.length > 0) {
+    var prev = navStack.pop();
+    vai(prev, true);
+  } else {
+    vai('home', true);
+  }
+}
+function goHome() { navStack = []; editingId = null; vai('home', true); }
+
+// ── HOME ──
+function aggiornaHome() {
+  var now = new Date();
+  var gg = ['Domenica','Lunedì','Martedì','Mercoledì','Giovedì','Venerdì','Sabato'];
+  document.getElementById('hdrSub').textContent = now.toLocaleDateString('it-IT',{day:'numeric',month:'long',year:'numeric'});
+  document.getElementById('homeDay').textContent = gg[now.getDay()]+' '+now.getDate()+' '+MESI[now.getMonth()]+' '+now.getFullYear();
+  var tot = db().length;
+  document.getElementById('homeSum').innerHTML = tot === 0
+    ? 'Nessuna tessera salvata ancora'
+    : '<b>'+tot+'</b> tessera'+(tot===1?'':'e')+' salvata'+(tot===1?'':'e');
+}
+
+// ── FORM INSERISCI ──
+var selectedColor = null;
+var pendingFoto = null;
+
+function buildSwatches(){
+  var row = document.getElementById('swatchRow');
+  row.innerHTML = '';
+  PALETTE.forEach(function(c){
+    var sw = document.createElement('div');
+    sw.className = 'swatch';
+    sw.style.background = c;
+    sw.dataset.color = c;
+    sw.onclick = function(){ selectColor(c); };
+    row.appendChild(sw);
+  });
+}
+function selectColor(c){
+  selectedColor = c;
+  document.querySelectorAll('#swatchRow .swatch').forEach(function(s){
+    s.classList.toggle('sel', s.dataset.color === c);
+    s.textContent = s.dataset.color === c ? '✓' : '';
+  });
+}
+function onNomeInput(){
+  var nome = document.getElementById('fNome').value;
+  if(!selectedColor || !document.getElementById('fNome').dataset.userPickedColor){
+    var auto = coloreFor(nome);
+    selectColor(auto);
+  }
+}
+document.addEventListener('DOMContentLoaded', function(){
+  buildSwatches();
+  var dl = document.getElementById('storeList');
+  STORE_NAMES.forEach(function(n){ var o=document.createElement('option'); o.value=n; dl.appendChild(o); });
+});
+
+function onFotoChange(ev){
+  var file = ev.target.files[0];
+  if(!file) return;
+  compressImage(file, 1000, 0.82, function(dataUrl){
+    pendingFoto = dataUrl;
+    renderFotoPreview();
+  });
+}
+function renderFotoPreview(){
+  var area = document.getElementById('fotoArea');
+  if(pendingFoto){
+    area.innerHTML =
+      '<div class="foto-preview-wrap">' +
+        '<img src="'+pendingFoto+'" alt="Anteprima tessera">' +
+        '<button type="button" class="foto-remove" onclick="rimuoviFoto()">✕</button>' +
+      '</div>';
+  } else {
+    area.innerHTML =
+      '<label class="foto-wrap" for="fFoto" id="fotoWrapLbl">' +
+        '<div class="fw-ico">📷</div>' +
+        '<div class="fw-t">Scatta o carica una foto della tessera</div>' +
+      '</label>' +
+      '<input type="file" id="fFoto" accept="image/*" capture="environment" style="display:none" onchange="onFotoChange(event)">';
+  }
+}
+function rimuoviFoto(){ pendingFoto = null; renderFotoPreview(); }
+
+function compressImage(file, maxW, quality, cb){
+  var reader = new FileReader();
+  reader.onload = function(e){
+    var img = new Image();
+    img.onload = function(){
+      var w = img.width, h = img.height;
+      if(w > maxW){ h = Math.round(h * (maxW / w)); w = maxW; }
+      var canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      cb(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.onerror = function(){ toast('⚠ Immagine non valida'); };
+    img.src = e.target.result;
+  };
+  reader.onerror = function(){ toast('⚠ Errore nella lettura del file'); };
+  reader.readAsDataURL(file);
+}
+
+function resetForm(){
+  editingId = null;
+  document.getElementById('fNome').value = '';
+  document.getElementById('fNome').dataset.userPickedColor = '';
+  document.getElementById('fNote').value = '';
+  pendingFoto = null;
+  renderFotoPreview();
+  selectColor(PALETTE[0]);
+  document.getElementById('fFoto') && (document.getElementById('fFoto').value = '');
+}
+
+function salvaTessera(){
+  var nome = document.getElementById('fNome').value.trim();
+  if(!nome){ toast('⚠ Inserisci il nome del negozio'); return; }
+  var note = document.getElementById('fNote').value.trim();
+  var d = db();
+  if(editingId){
+    var idx = d.findIndex(function(t){ return t.id === editingId; });
+    if(idx >= 0){
+      d[idx].nome = nome;
+      d[idx].colore = selectedColor || coloreFor(nome);
+      d[idx].note = note;
+      if(pendingFoto !== undefined && pendingFoto !== null) d[idx].foto = pendingFoto;
+      if(pendingFoto === null && d[idx]._removedFoto) d[idx].foto = null;
+    }
+    saveDb(d);
+    toast('✓ Tessera aggiornata');
+    editingId = null;
+    goHome();
+    return;
+  }
+  var tessera = {
+    id: uid(),
+    nome: nome,
+    colore: selectedColor || coloreFor(nome),
+    note: note,
+    foto: pendingFoto || null,
+    data: new Date().toISOString()
+  };
+  d.push(tessera);
+  saveDb(d);
+  toast('✓ Tessera salvata');
+  resetForm();
+  vai('tessere', true);
+  navStack = ['home'];
+}
+
+// ── LE MIE TESSERE ──
+function renderTessere(){
+  var q = (document.getElementById('searchTessere').value || '').trim().toLowerCase();
+  var d = db().slice().sort(function(a,b){ return (a.nome||'').localeCompare(b.nome||'','it'); });
+  if(q) d = d.filter(function(t){ return (t.nome||'').toLowerCase().indexOf(q) !== -1; });
+  var grid = document.getElementById('tessereGrid');
+  if(!d.length){
+    grid.innerHTML =
+      '<div class="empty-state">' +
+        '<div class="es-ico">🪪</div>' +
+        '<div class="es-t">'+(db().length? 'Nessun risultato' : 'Nessuna tessera')+'</div>' +
+        '<div class="es-d">'+(db().length? 'Prova con un altro nome' : 'Tocca "Inserisci" per aggiungere la tua prima tessera')+'</div>' +
+      '</div>';
+    return;
+  }
+  var html = '<div class="store-grid">';
+  d.forEach(function(t){
+    var avatar = t.foto
+      ? '<img src="'+t.foto+'" alt="">'
+      : esc(inizialiFrom(t.nome));
+    html += '<button class="store-tile" onclick="apriDettaglio(\''+t.id+'\')">' +
+      '<div class="store-avatar" style="background:'+(t.foto? '#eee' : (t.colore||coloreFor(t.nome)))+'">'+avatar+'</div>' +
+      '<div class="store-tile-name">'+esc(t.nome)+'</div>' +
+    '</button>';
+  });
+  html += '</div>';
+  grid.innerHTML = html;
+}
+
+// ── DETTAGLIO ──
+function apriDettaglio(id){
+  currentDettaglioId = id;
+  var t = db().find(function(x){ return x.id === id; });
+  if(!t){ toast('⚠ Tessera non trovata'); goHome(); return; }
+  document.getElementById('detNome').textContent = t.nome;
+  document.getElementById('detNote').textContent = t.note || '';
+  document.getElementById('detNote').style.display = t.note ? 'block' : 'none';
+  var av = document.getElementById('detAvatar');
+  av.style.background = t.foto ? '#eee' : (t.colore || coloreFor(t.nome));
+  av.innerHTML = t.foto ? '<img src="'+t.foto+'" alt="">' : esc(inizialiFrom(t.nome));
+  var wrap = document.getElementById('detPhotoWrap');
+  wrap.innerHTML = t.foto
+    ? '<img src="'+t.foto+'" alt="Tessera '+esc(t.nome)+'">'
+    : '<div class="det-noimg">Nessuna foto salvata per questa tessera</div>';
+  vai('dettaglio');
+}
+function modificaTessera(){
+  var t = db().find(function(x){ return x.id === currentDettaglioId; });
+  if(!t) return;
+  editingId = t.id;
+  document.getElementById('fNome').value = t.nome;
+  document.getElementById('fNome').dataset.userPickedColor = '1';
+  document.getElementById('fNote').value = t.note || '';
+  pendingFoto = t.foto || null;
+  renderFotoPreview();
+  selectColor(t.colore || coloreFor(t.nome));
+  vai('inserisci');
+}
+function eliminaTessera(){
+  if(!confirm('Eliminare questa tessera? Irreversibile.')) return;
+  var d = db().filter(function(x){ return x.id !== currentDettaglioId; });
+  saveDb(d);
+  toast('Tessera eliminata');
+  goHome();
+}
+
+// ── IMPOSTAZIONI ──
+function initImpostazioni(){
+  var d = db();
+  document.getElementById('infoCount').textContent = d.length + ' tessera' + (d.length===1?'':'e') + ' salvata' + (d.length===1?'':'e');
+  document.getElementById('infoVersione').textContent = 'Versione ' + APP_VERSION;
+  document.getElementById('creditsVersione').textContent = APP_VERSION;
+}
+
+// ── IMPORT / EXPORT ──
+function leggiFile(input) {
+  var file = input.files[0];
+  if(!file) return;
+  document.getElementById('fileLabel').textContent = file.name;
+  document.getElementById('importArea').style.display = 'block';
+  var reader = new FileReader();
+  reader.onload = function(e){ window._pendingImportRaw = e.target.result; };
+  reader.onerror = function(){ toast('⚠ Errore nella lettura del file'); };
+  reader.readAsText(file);
+}
+function annullaImport(){
+  document.getElementById('importArea').style.display = 'none';
+  document.getElementById('fileInput').value = '';
+  document.getElementById('fileLabel').textContent = '—';
+  window._pendingImportRaw = null;
+}
+function importa(){
+  var raw = window._pendingImportRaw;
+  if(!raw){ toast('⚠ Nessun file selezionato'); return; }
+  var parsed;
+  try { parsed = JSON.parse(raw); } catch(e){ toast('⚠ Errore: file JSON non valido'); return; }
+
+  var tessere = null;
+  if(parsed && parsed.tipo === 'tessere-fedelta-backup' && Array.isArray(parsed.tessere)) tessere = parsed.tessere;
+  else if(Array.isArray(parsed)) tessere = parsed;
+
+  if(!tessere){ toast('⚠ Formato file non riconosciuto'); return; }
+  if(!confirm('Ripristinare il backup?\n\nQuesto SOSTITUISCE le tessere attuali con quelle del file ('+tessere.length+').')) return;
+
+  saveDb(tessere);
+  annullaImport();
+  toast('✓ Backup ripristinato ('+tessere.length+' tessere)');
+  aggiornaHome();
+  initImpostazioni();
+}
+function esporta(){
+  var backup = {
+    tipo: 'tessere-fedelta-backup',
+    versione: 1,
+    data: new Date().toISOString().slice(0,10),
+    tessere: db()
+  };
+  var blob = new Blob([JSON.stringify(backup, null, 2)], {type: 'application/json'});
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'tessere_backup_' + new Date().toISOString().slice(0,10) + '.json';
+  a.click();
+}
+function svuota(){
+  if(!confirm('Eliminare TUTTE le tessere? Irreversibile.')) return;
+  localStorage.removeItem(DB_KEY);
+  toast('Archivio svuotato');
+  aggiornaHome();
+  initImpostazioni();
+}
+
+// ── UTILS ──
+var _toastTimer;
+function toast(msg){
+  var t = document.getElementById('toast');
+  t.textContent = msg; t.style.display = 'block';
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(function(){ t.style.display = 'none'; }, 2800);
+}
+function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// ── ABOUT / CRONOLOGIA ──
+var CHANGELOG = [
+  { v:'v1', data:'2026-08-10', voci:['Prima versione: inserimento tessere con foto, elenco con loghi colorati, backup JSON.'] }
+];
+function showAbout(){
+  var box = document.getElementById('aboutBox');
+  var html = '<div class="about-header"><div class="about-logo">🪪</div><div><div class="about-title">Tessere Fedeltà</div><div class="about-sub">Versione '+APP_VERSION+'</div></div></div>';
+  html += '<div class="about-dev">Le tue tessere punti, sempre a portata di mano.</div>';
+  CHANGELOG.forEach(function(c){
+    html += '<div class="about-section"><div class="about-ver">'+c.v+' <span class="about-date">'+c.data+'</span></div>';
+    html += '<div class="about-changes">' + c.voci.map(esc).join('<br>') + '</div></div>';
+  });
+  html += '<button class="about-close" onclick="closeAbout()">Chiudi</button>';
+  box.innerHTML = html;
+  document.getElementById('aboutWrap').classList.add('open');
+}
+function closeAbout(){ document.getElementById('aboutWrap').classList.remove('open'); }
+
+// ── INIT ──
+aggiornaHome();
+document.getElementById('creditsVersione').textContent = APP_VERSION;
+
+// Service worker per funzionamento offline
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function(){
+    navigator.serviceWorker.register('service-worker.js').catch(function(){});
+  });
+  var swReloading = false;
+  navigator.serviceWorker.addEventListener('controllerchange', function(){
+    if(swReloading) return;
+    swReloading = true;
+    window.location.reload();
+  });
+}
+</script>
+
+<!-- ═══ MODALE INFO / CRONOLOGIA ═══ -->
+<style>
+.about-wrap{position:fixed;inset:0;background:rgba(10,12,14,.55);display:none;align-items:center;justify-content:center;z-index:160;padding:16px;}
+.about-wrap.open{display:flex;}
+.about-box{background:#fff;border:1px solid #d3d1c7;border-radius:16px;width:100%;max-width:600px;max-height:85vh;overflow-y:auto;padding:24px 22px;box-shadow:0 20px 50px rgba(0,0,0,.25);animation:aboutIn .2s ease;}
+@keyframes aboutIn{from{opacity:0;transform:translateY(10px) scale(.97);}to{opacity:1;transform:none;}}
+.about-header{display:flex;align-items:center;gap:14px;margin-bottom:18px;}
+.about-logo{font-size:32px;}
+.about-title{font-size:18px;font-weight:700;color:#1a1a18;}
+.about-sub{font-size:12px;color:#888;margin-top:2px;}
+.about-dev{font-size:12.5px;color:#6b6a63;margin-bottom:18px;}
+.about-section{margin-bottom:14px;}
+.about-ver{font-weight:700;font-size:13px;color:#1a1a18;margin-bottom:4px;display:flex;align-items:baseline;gap:6px;}
+.about-ver .about-date{font-weight:400;font-size:11px;color:#aaa;}
+.about-changes{font-size:11.5px;color:#6b6a63;line-height:1.6;padding-left:12px;border-left:2px solid #e8e6df;margin-bottom:6px;}
+.about-close{display:block;margin:14px auto 0;background:#1a1a18;color:#f5f4f0;border:none;border-radius:10px;padding:10px 32px;font-size:14px;font-weight:600;font-family:inherit;cursor:pointer;}
+</style>
+<div class="about-wrap" id="aboutWrap" onclick="if(event.target===this)closeAbout()">
+  <div class="about-box" id="aboutBox"></div>
+</div>
+
+</body>
+</html>

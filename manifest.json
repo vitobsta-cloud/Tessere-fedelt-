@@ -1,0 +1,17 @@
+{
+  "name": "Tessere Fedeltà",
+  "short_name": "Tessere",
+  "description": "App per gestire le tessere fedeltà dei supermercati",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#eceff1",
+  "theme_color": "#1a1a18",
+  "icons": [
+    {
+      "src": "logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
