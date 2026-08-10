@@ -106,6 +106,11 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#eceff1;color:#1a1a1
 .foto-wrap:hover{border-color:#888;}
 .foto-wrap .fw-ico{font-size:24px;margin-bottom:4px;}
 .foto-wrap .fw-t{font-size:12.5px;color:#5f5e5a;font-weight:500;}
+.foto-choice-row{display:flex;gap:10px;}
+.foto-choice{flex:1;border:1.5px dashed #d3d1c7;border-radius:12px;padding:16px 8px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s;background:#fafaf9;}
+.foto-choice:hover{border-color:#888;background:#f2f1ec;}
+.foto-choice .fw-ico{font-size:22px;margin-bottom:4px;}
+.foto-choice .fw-t{font-size:12px;color:#5f5e5a;font-weight:600;}
 .foto-preview-wrap{position:relative;border-radius:12px;overflow:hidden;border:1px solid #d3d1c7;}
 .foto-preview-wrap img{width:100%;display:block;max-height:220px;object-fit:contain;background:#f1efe8;}
 .foto-remove{position:absolute;top:8px;right:8px;background:rgba(26,26,24,0.75);color:#fff;border:none;border-radius:50%;width:28px;height:28px;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
@@ -311,7 +316,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#eceff1;color:#1a1a1
 <div id="toast"></div>
 
 <script>
-var APP_VERSION = 'v14';
+var APP_VERSION = 'v15';
 var DB_KEY = 'tf_db_v1';
 var MESI = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
 
@@ -550,13 +555,21 @@ function renderFotoSlot(slot){
         '<button type="button" class="foto-remove" onclick="rimuoviFoto(\''+slot+'\')">✕</button>' +
       '</div>';
   } else {
-    var testo = slot==='fronte' ? 'Scatta una foto o scegli dalla galleria (fronte)' : 'Scatta una foto o scegli dalla galleria (retro)';
+    var inputIdCam = inputId + '_cam';
+    var inputIdGal = inputId + '_gal';
     area.innerHTML =
-      '<label class="foto-wrap" for="'+inputId+'">' +
-        '<div class="fw-ico">📷</div>' +
-        '<div class="fw-t">'+testo+'</div>' +
-      '</label>' +
-      '<input type="file" id="'+inputId+'" accept="image/*" style="display:none" onchange="onFotoChange(event,\''+slot+'\')">';
+      '<div class="foto-choice-row">' +
+        '<label class="foto-choice" for="'+inputIdCam+'">' +
+          '<div class="fw-ico">📷</div>' +
+          '<div class="fw-t">Scatta foto</div>' +
+        '</label>' +
+        '<label class="foto-choice" for="'+inputIdGal+'">' +
+          '<div class="fw-ico">🖼️</div>' +
+          '<div class="fw-t">Dalla galleria</div>' +
+        '</label>' +
+      '</div>' +
+      '<input type="file" id="'+inputIdCam+'" accept="image/*" capture="environment" style="display:none" onchange="onFotoChange(event,\''+slot+'\')">' +
+      '<input type="file" id="'+inputIdGal+'" accept="image/*" style="display:none" onchange="onFotoChange(event,\''+slot+'\')">';
   }
   aggiornaVisibilitaRetry();
 }
@@ -1161,6 +1174,7 @@ function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').repla
 
 // ── ABOUT / CRONOLOGIA ──
 var CHANGELOG = [
+  { v:'v15', data:'2026-08-10', voci:['Corretto: su alcuni telefoni (MIUI/Xiaomi in particolare) il menu unico apri-file nascondeva l\'opzione fotocamera. Ora ci sono due pulsanti separati e sempre garantiti: "Scatta foto" e "Dalla galleria".'] },
   { v:'v14', data:'2026-08-10', voci:['Ora si può caricare la foto anche dalla galleria/file già esistenti, non solo scattandola sul momento: il pulsante "Carica foto" apre la scelta tra fotocamera e file.','Il riconoscimento del nome negozio riprova automaticamente fino a 3 volte se non trova nulla al primo tentativo, senza dover ricliccare a mano.','Messaggi del banner ora specifici per ogni fase (ricerca barcode, ricerca nome con numero del tentativo, lettura cifre di riserva) invece del solo testo generico.','L\'OCR sulle cifre parte solo se il codice a barre non viene letto direttamente, risparmiando tempo quando il barcode funziona.'] },
   { v:'v13', data:'2026-08-10', voci:['Nuovo tasto dedicato "Rileva codice a barre": esegue SOLO la lettura diretta del barcode (veloce, senza il peso dell\'OCR completo) con un messaggio specifico sul suo esito.','Il tasto "Rileva anche nome e numero" resta per la scansione completa (barcode + OCR di riserva + nome negozio).','Messaggi del banner più specifici a seconda di quale rilevamento è in corso.'] },
   { v:'v12', data:'2026-08-10', voci:['Novità importante: l\'app ora prova prima a leggere il codice a barre DIRETTAMENTE (come uno scanner alla cassa), invece di leggere solo le cifre stampate accanto. Molto più affidabile quando funziona: usa prima l\'API nativa del browser, poi una libreria di riserva se il telefono non la supporta. Il numero letto in questo modo viene segnalato come "alta affidabilità".','Se il codice a barre non si riesce a decodificare, l\'app torna comunque al riconoscimento delle cifre stampate come prima.'] },
