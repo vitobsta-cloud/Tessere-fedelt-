@@ -316,7 +316,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#eceff1;color:#1a1a1
 <div id="toast"></div>
 
 <script>
-var APP_VERSION = 'v16';
+var APP_VERSION = 'v17';
 var DB_KEY = 'tf_db_v1';
 var MESI = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
 
@@ -726,6 +726,9 @@ function caricaZXing(){
 }
 // Prova prima l'API nativa del browser (veloce, integrata, ottimo supporto su Chrome/Android);
 // se non disponibile o non trova nulla, usa una libreria di decodifica come riserva.
+// Nota: i codici UPC-A (12 cifre) vengono stampati per convenzione con uno "0" davanti,
+// che li rende compatibili come EAN-13 — ma quello "0" non è codificato nelle barre stesse,
+// quindi va riaggiunto a mano per far combaciare il numero con quello leggibile sulla tessera.
 function decodificaBarcode(dataUrl){
   var formatiUtili = ['ean_13','ean_8','upc_a','upc_e','code_128','code_39','codabar','itf'];
   var provaNativo = ('BarcodeDetector' in window)
@@ -735,7 +738,9 @@ function decodificaBarcode(dataUrl){
         var detector = new window.BarcodeDetector({ formats: formati });
         return caricaImgEl(dataUrl).then(function(img){ return detector.detect(img); });
       }).then(function(risultati){
-        return (risultati && risultati.length) ? risultati[0].rawValue : null;
+        if(!risultati || !risultati.length) return null;
+        var r = risultati[0];
+        return (r.format === 'upc_a') ? ('0' + r.rawValue) : r.rawValue;
       }).catch(function(){ return null; })
     : Promise.resolve(null);
 
@@ -744,7 +749,12 @@ function decodificaBarcode(dataUrl){
     // Riserva: libreria ZXing, funziona anche dove l'API nativa non è supportata
     return caricaZXing().then(function(){
       var reader = new ZXing.BrowserMultiFormatReader();
-      return reader.decodeFromImageUrl(dataUrl).then(function(res){ return res.getText(); });
+      return reader.decodeFromImageUrl(dataUrl).then(function(res){
+        var testo = res.getText();
+        var fmt = res.getBarcodeFormat && res.getBarcodeFormat();
+        var isUpcA = fmt && ZXing.BarcodeFormat && fmt === ZXing.BarcodeFormat.UPC_A;
+        return (isUpcA && testo.length === 12) ? ('0' + testo) : testo;
+      });
     }).catch(function(){ return null; });
   });
 }
@@ -1174,6 +1184,7 @@ function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').repla
 
 // ── ABOUT / CRONOLOGIA ──
 var CHANGELOG = [
+  { v:'v17', data:'2026-08-10', voci:['Corretto: i codici a barre in formato UPC-A (12 cifre) venivano letti senza lo "0" iniziale che viene stampato per convenzione sulla tessera (quello zero non fa parte delle barre vere e proprie). Ora viene riaggiunto automaticamente.'] },
   { v:'v16', data:'2026-08-10', voci:['Trovata e corretta la vera causa del "resta bloccato su una versione vecchia": il browser controlla da solo se c\'è un aggiornamento solo ogni tanto (anche una volta al giorno). Ora l\'app forza il controllo subito ad ogni apertura.','Il service worker ora scarica sempre la pagina più recente dalla rete quando c\'è connessione, usando la copia salvata solo quando sei offline — prima faceva il contrario.'] },
   { v:'v15', data:'2026-08-10', voci:['Corretto: su alcuni telefoni (MIUI/Xiaomi in particolare) il menu unico apri-file nascondeva l\'opzione fotocamera. Ora ci sono due pulsanti separati e sempre garantiti: "Scatta foto" e "Dalla galleria".'] },
   { v:'v14', data:'2026-08-10', voci:['Ora si può caricare la foto anche dalla galleria/file già esistenti, non solo scattandola sul momento: il pulsante "Carica foto" apre la scelta tra fotocamera e file.','Il riconoscimento del nome negozio riprova automaticamente fino a 3 volte se non trova nulla al primo tentativo, senza dover ricliccare a mano.','Messaggi del banner ora specifici per ogni fase (ricerca barcode, ricerca nome con numero del tentativo, lettura cifre di riserva) invece del solo testo generico.','L\'OCR sulle cifre parte solo se il codice a barre non viene letto direttamente, risparmiando tempo quando il barcode funziona.'] },
