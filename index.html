@@ -18,6 +18,8 @@
 body{font-family:'Segoe UI',system-ui,sans-serif;background:#eceff1;color:#1a1a18;min-height:100vh;padding-bottom:50px;}
 .credits{position:fixed;bottom:12px;right:16px;font-size:11px;color:#90a4ae;font-family:monospace;z-index:1000;background:rgba(236,239,241,0.85);padding:4px 10px;border-radius:20px;backdrop-filter:blur(4px);}
 .hdr{background:#1a1a18;color:#f5f4f0;padding:16px 20px;display:flex;align-items:center;gap:12px;}
+.offline-banner{display:none;background:#fff3cd;color:#7a5b00;border-bottom:1px solid #ffe08a;font-size:12.5px;font-weight:600;text-align:center;padding:8px 14px;}
+.offline-banner.show{display:block;}
 .hdr-back{background:rgba(255,255,255,0.12);border:none;color:#f5f4f0;font-size:15px;font-weight:600;cursor:pointer;padding:8px 12px;line-height:1;display:none;border-radius:10px;transition:background .15s;align-items:center;gap:6px;}
 .hdr-back:active{background:rgba(255,255,255,0.25);}
 .hdr-back.show{display:flex;}
@@ -96,8 +98,9 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#eceff1;color:#1a1a1
 
 /* KLARNA-STYLE GRID (Le mie tessere) */
 .store-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
-.store-tile{position:relative;aspect-ratio:8/5;border-radius:16px;border:none;cursor:pointer;font-family:inherit;overflow:hidden;box-shadow:0 3px 10px rgba(0,0,0,0.14);transition:transform .1s;display:flex;align-items:center;justify-content:center;padding:14px;}
+.store-tile{position:relative;aspect-ratio:8/5;border-radius:16px;border:none;cursor:pointer;font-family:inherit;overflow:hidden;box-shadow:0 3px 10px rgba(0,0,0,0.14);transition:transform .1s;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:14px;}
 .store-tile:active{transform:scale(.96);}
+.store-tile-ico{font-size:24px;line-height:1;margin-bottom:2px;filter:drop-shadow(0 1px 2px rgba(0,0,0,.25));}
 .store-tile-name{color:#fff;font-size:17px;font-weight:800;text-align:center;line-height:1.2;text-shadow:0 1px 3px rgba(0,0,0,0.25);word-break:break-word;}
 .store-tile-note{color:rgba(255,255,255,0.92);font-size:12px;font-weight:600;text-align:center;margin-top:4px;text-shadow:0 1px 3px rgba(0,0,0,0.25);word-break:break-word;}
 .empty-state{text-align:center;padding:50px 20px;color:#888780;}
@@ -109,6 +112,9 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#eceff1;color:#1a1a1
 .swatch-row{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:4px;}
 .swatch{width:34px;height:34px;border-radius:50%;cursor:pointer;border:2px solid transparent;display:flex;align-items:center;justify-content:center;font-size:15px;color:#fff;transition:border-color .15s,transform .1s;}
 .swatch.sel{border-color:#1a1a18;transform:scale(1.12);}
+.icon-row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:4px;}
+.icon-chip{width:38px;height:38px;border-radius:10px;background:#f5f4f0;border:1.5px solid #e2e0d8;display:flex;align-items:center;justify-content:center;font-size:19px;cursor:pointer;transition:border-color .15s,transform .1s;}
+.icon-chip.sel{border-color:#1a1a18;background:#fff;transform:scale(1.1);box-shadow:0 1px 4px rgba(0,0,0,.15);}
 
 /* PHOTO CAPTURE */
 .foto-wrap{border:1.5px dashed #d3d1c7;border-radius:12px;padding:16px;text-align:center;cursor:pointer;transition:border-color .15s;background:#fafaf9;}
@@ -128,7 +134,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#eceff1;color:#1a1a1
 /* DIGITAL CARD — la schermata "da mostrare alla cassa" */
 .digicard{border-radius:18px;overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,0.18);margin-bottom:18px;}
 .digicard-top{padding:16px 18px;color:#fff;display:flex;align-items:center;gap:12px;}
-.digicard-badge{width:46px;height:46px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:16px;flex-shrink:0;box-shadow:0 1px 4px rgba(0,0,0,0.25);}
+.digicard-badge{width:46px;height:46px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:22px;flex-shrink:0;box-shadow:0 1px 4px rgba(0,0,0,0.25);}
 .digicard-name{font-size:19px;font-weight:800;text-shadow:0 1px 2px rgba(0,0,0,0.2);text-align:left;flex:1;}
 .digicard-note{font-size:13px;font-weight:600;color:rgba(255,255,255,0.92);margin-top:2px;text-shadow:0 1px 2px rgba(0,0,0,0.2);}
 .digicard-body{background:#fff;padding:20px 14px 24px;text-align:center;}
@@ -156,6 +162,8 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#eceff1;color:#1a1a1
 </style>
 </head>
 <body>
+
+<div class="offline-banner" id="offlineBanner">📴 Sei offline — l'app funziona comunque, i dati salvati restano disponibili</div>
 
 <div class="credits" onclick="showAbout()" style="cursor:pointer">TR/software <span id="creditsVersione" style="opacity:.6"></span></div>
 
@@ -226,6 +234,11 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#eceff1;color:#1a1a1
       <div class="btn-row ocr-retry-row" id="ocrRetryRow" style="display:none;margin-top:6px">
         <button type="button" class="btn-scan btn-scan-full" onclick="riprovaOCR()">🔄 Rileva anche nome e numero (completo)</button>
         <button type="button" class="btn-scan btn-scan-barcode" onclick="rilevaSoloBarcode()">📷 Rileva codice a barre</button>
+      </div>
+
+      <div class="fg" style="margin-top:6px">
+        <label>Icona tessera</label>
+        <div class="icon-row" id="iconRow"></div>
       </div>
 
       <div class="fg" style="margin-top:6px">
@@ -331,7 +344,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#eceff1;color:#1a1a1
 <div id="toast"></div>
 
 <script>
-var APP_VERSION = 'v20';
+var APP_VERSION = 'v23';
 var DB_KEY = 'tf_db_v1';
 var MESI = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
 
@@ -341,58 +354,131 @@ var PALETTE = ['#e53935','#8e24aa','#3949ab','#1e88e5','#00897b','#43a047','#fb8
 // ── CATENE NOTE — stessa logica "a parola-chiave" della versione desktop:
 // basta che il testo OCR contenga la parola, senza bisogno di corrispondenza esatta ──
 var STORE_HINTS = [
-  {hint:'esselunga', n:'Esselunga', c:'#e2001a'},
-  {hint:'conad', n:'Conad', c:'#0033a0'},
-  {hint:'coop', n:'Coop', c:'#c8102e'},
-  {hint:'carrefour', n:'Carrefour', c:'#00549f'},
-  {hint:'lidl', n:'Lidl', c:'#0050aa'},
-  {hint:'eurospin', n:'Eurospin', c:'#f39200'},
-  {hint:'pam', n:'Pam', c:'#e4032e'},
-  {hint:'despar', n:'Despar', c:'#00953b'},
-  {hint:'iper', n:'Iper', c:'#ff6600'},
-  {hint:'auchan', n:'Auchan', c:'#e2001a'},
-  {hint:'todis', n:'Todis', c:'#f7a600'},
-  {hint:'famila', n:'Famila', c:'#004b93'},
-  {hint:'crai', n:'Crai', c:'#00a651'},
-  {hint:'bennet', n:'Bennet', c:'#004b8d'},
-  {hint:'tigros', n:'Tigros', c:'#005baa'},
-  {hint:"in's", n:"In's", c:'#e30613'},
-  {hint:'simply', n:'Simply', c:'#8dc63f'},
-  {hint:'basko', n:'Basko', c:'#0066b3'},
-  {hint:'ipercoop', n:'Ipercoop', c:'#c8102e'},
-  {hint:'penny', n:'Penny', c:'#ed1c24'},
-  {hint:'sisa', n:'Sisa', c:'#e30613'},
-  {hint:'sigma', n:'Sigma', c:'#0066b3'},
-  {hint:'unieuro', n:'Unieuro', c:'#1a2b4a'},
-  {hint:'tigotà', n:'Tigotà', c:'#00a0a0'},
-  {hint:'tigota', n:'Tigotà', c:'#00a0a0'},
-  {hint:'il gigante', n:'Il Gigante', c:'#c8102e'},
-  {hint:'viridea', n:'Viridea', c:'#1f6b2e'},
-  {hint:'beautystar', n:'BeautyStar', c:'#111111'},
-  {hint:'obi', n:'OBI', c:'#f36c21'},
-  {hint:'action', n:'Action', c:'#0055a4'},
-  {hint:'kik', n:'KIK', c:'#e2001a'},
-  {hint:'decathlon', n:'Decathlon', c:'#0082c3'},
-  {hint:'amazon', n:'Amazon', c:'#ff9900'},
-  {hint:'ikea', n:'Ikea', c:'#0058a3'},
-  {hint:'leroy merlin', n:'Leroy Merlin', c:'#78be20'},
-  {hint:'bricoman', n:'Bricoman', c:'#e2001a'},
-  {hint:'mediaworld', n:'Mediaworld', c:'#e2001a'},
-  {hint:'mediamarket', n:'Mediaworld', c:'#e2001a'},
-  {hint:'trony', n:'Trony', c:'#0055a4'},
-  {hint:'euronics', n:'Euronics', c:'#004b93'},
-  {hint:'acqua e sapone', n:'Acqua e Sapone', c:'#00a0a0'},
-  {hint:'aldi', n:'Aldi', c:'#00447c'},
-  {hint:'happy casa', n:'Happy Casa', c:'#e2001a'},
-  {hint:'center casa', n:'Center Casa', c:'#0066b3'},
-  {hint:'carpisa', n:'Carpisa', c:'#111111'}
+  {hint:'esselunga', n:'Esselunga', c:'#e2001a', ic:'🛒'},
+  {hint:'conad', n:'Conad', c:'#0033a0', ic:'🛒'},
+  {hint:'coop', n:'Coop', c:'#c8102e', ic:'🛒'},
+  {hint:'carrefour', n:'Carrefour', c:'#00549f', ic:'🛒'},
+  {hint:'lidl', n:'Lidl', c:'#0050aa', ic:'🛒'},
+  {hint:'eurospin', n:'Eurospin', c:'#f39200', ic:'🛒'},
+  {hint:'pam', n:'Pam', c:'#e4032e', ic:'🛒'},
+  {hint:'despar', n:'Despar', c:'#00953b', ic:'🛒'},
+  {hint:'iper', n:'Iper', c:'#ff6600', ic:'🛒'},
+  {hint:'auchan', n:'Auchan', c:'#e2001a', ic:'🛒'},
+  {hint:'todis', n:'Todis', c:'#f7a600', ic:'🛒'},
+  {hint:'famila', n:'Famila', c:'#004b93', ic:'🛒'},
+  {hint:'crai', n:'Crai', c:'#00a651', ic:'🛒'},
+  {hint:'bennet', n:'Bennet', c:'#004b8d', ic:'🛒'},
+  {hint:'tigros', n:'Tigros', c:'#005baa', ic:'🛒'},
+  {hint:"in's", n:"In's", c:'#e30613', ic:'🛒'},
+  {hint:'simply', n:'Simply', c:'#8dc63f', ic:'🛒'},
+  {hint:'basko', n:'Basko', c:'#0066b3', ic:'🛒'},
+  {hint:'ipercoop', n:'Ipercoop', c:'#c8102e', ic:'🛒'},
+  {hint:'penny', n:'Penny', c:'#ed1c24', ic:'🛒'},
+  {hint:'sisa', n:'Sisa', c:'#e30613', ic:'🛒'},
+  {hint:'sigma', n:'Sigma', c:'#0066b3', ic:'🛒'},
+  {hint:'aldi', n:'Aldi', c:'#00447c', ic:'🛒'},
+  {hint:'md discount', n:'MD', c:'#e2001a', ic:'🛒'},
+  {hint:"panorama", n:'Panorama', c:'#00549f', ic:'🛒'},
+  {hint:'iperal', n:'Iperal', c:'#e30613', ic:'🛒'},
+  {hint:'rossetto', n:'Rossetto', c:'#c8102e', ic:'🛒'},
+  {hint:'emisfero', n:'Emisfero', c:'#0066b3', ic:'🛒'},
+  {hint:'naturasì', n:'NaturaSì', c:'#4c8c2b', ic:'🥦'},
+  {hint:'naturasi', n:'NaturaSì', c:'#4c8c2b', ic:'🥦'},
+  {hint:'il gigante', n:'Il Gigante', c:'#c8102e', ic:'🛒'},
+  {hint:'unieuro', n:'Unieuro', c:'#1a2b4a', ic:'📺'},
+  {hint:'mediaworld', n:'Mediaworld', c:'#e2001a', ic:'📺'},
+  {hint:'mediamarket', n:'Mediaworld', c:'#e2001a', ic:'📺'},
+  {hint:'trony', n:'Trony', c:'#0055a4', ic:'📺'},
+  {hint:'euronics', n:'Euronics', c:'#004b93', ic:'📺'},
+  {hint:'comet', n:'Comet', c:'#0055a4', ic:'📺'},
+  {hint:'expert', n:'Expert', c:'#e2001a', ic:'📺'},
+  {hint:'tigotà', n:'Tigotà', c:'#00a0a0', ic:'💄'},
+  {hint:'tigota', n:'Tigotà', c:'#00a0a0', ic:'💄'},
+  {hint:'beautystar', n:'BeautyStar', c:'#111111', ic:'💄'},
+  {hint:'acqua e sapone', n:'Acqua e Sapone', c:'#00a0a0', ic:'💄'},
+  {hint:'sephora', n:'Sephora', c:'#111111', ic:'💄'},
+  {hint:'douglas', n:'Douglas', c:'#111111', ic:'💄'},
+  {hint:'farmacia', n:'Farmacia', c:'#00953b', ic:'💊'},
+  {hint:'lloyds', n:'LloydsFarmacia', c:'#0058a3', ic:'💊'},
+  {hint:'viridea', n:'Viridea', c:'#1f6b2e', ic:'🌿'},
+  {hint:'obi', n:'OBI', c:'#f36c21', ic:'🧰'},
+  {hint:'leroy merlin', n:'Leroy Merlin', c:'#78be20', ic:'🧰'},
+  {hint:'bricoman', n:'Bricoman', c:'#e2001a', ic:'🧰'},
+  {hint:'bricofer', n:'Bricofer', c:'#f39200', ic:'🧰'},
+  {hint:'action', n:'Action', c:'#0055a4', ic:'🏠'},
+  {hint:'happy casa', n:'Happy Casa', c:'#e2001a', ic:'🛋️'},
+  {hint:'center casa', n:'Center Casa', c:'#0066b3', ic:'🛋️'},
+  {hint:'ikea', n:'Ikea', c:'#0058a3', ic:'🛋️'},
+  {hint:'kasanova', n:'Kasanova', c:'#c8102e', ic:'🍽️'},
+  {hint:'kik', n:'KIK', c:'#e2001a', ic:'👕'},
+  {hint:'zara', n:'Zara', c:'#111111', ic:'👗'},
+  {hint:'h&m', n:'H&M', c:'#c8102e', ic:'👗'},
+  {hint:'ovs', n:'OVS', c:'#0033a0', ic:'👕'},
+  {hint:'coin', n:'Coin', c:'#111111', ic:'👗'},
+  {hint:'piazza italia', n:'Piazza Italia', c:'#c8102e', ic:'👕'},
+  {hint:'terranova', n:'Terranova', c:'#0055a4', ic:'👕'},
+  {hint:'calzedonia', n:'Calzedonia', c:'#111111', ic:'🧦'},
+  {hint:'intimissimi', n:'Intimissimi', c:'#d81b60', ic:'🧦'},
+  {hint:'carpisa', n:'Carpisa', c:'#111111', ic:'👜'},
+  {hint:'zalando', n:'Zalando', c:'#ff6900', ic:'👗'},
+  {hint:'decathlon', n:'Decathlon', c:'#0082c3', ic:'🏅'},
+  {hint:'toys center', n:'Toys Center', c:'#e2001a', ic:'🧸'},
+  {hint:'prenatal', n:'Prénatal', c:'#00a0a0', ic:'👶'},
+  {hint:'amazon', n:'Amazon', c:'#ff9900', ic:'📦'},
+  {hint:'mcdonald', n:"McDonald's", c:'#da291c', ic:'🍔'},
+  {hint:'burger king', n:'Burger King', c:'#d62300', ic:'🍔'},
+  {hint:'autogrill', n:'Autogrill', c:'#0033a0', ic:'⛽'},
+  {hint:'q8', n:'Q8', c:'#e2001a', ic:'⛽'},
+  {hint:'eni', n:'Eni', c:'#ffc300', ic:'⛽'},
+  {hint:'ip carburanti', n:'IP', c:'#0033a0', ic:'⛽'}
 ];
-// Lista deduplicata (per suggerimenti nel campo e colore quando il nome è scritto a mano)
+// Lista deduplicata (per suggerimenti nel campo, colore e icona quando il nome è scritto a mano)
 var STORE_LIST = (function(){
   var visti = {}, out = [];
-  STORE_HINTS.forEach(function(s){ if(!visti[s.n]){ visti[s.n]=1; out.push({n:s.n, c:s.c}); } });
+  STORE_HINTS.forEach(function(s){ if(!visti[s.n]){ visti[s.n]=1; out.push({n:s.n, c:s.c, ic:s.ic}); } });
   return out;
 })();
+
+// Icone selezionabili manualmente per la tessera (nessun logo reale scaricato:
+// solo emoji generiche per categoria merceologica, per riconoscere più in fretta
+// la tessera a colpo d'occhio nella griglia "Le mie tessere").
+var ICONS_PICKER = [
+  {ic:'🛒', label:'Supermercato'},
+  {ic:'🧰', label:'Bricolage / fai-da-te'},
+  {ic:'📺', label:'Elettronica'},
+  {ic:'💄', label:'Bellezza / profumeria'},
+  {ic:'💊', label:'Farmacia'},
+  {ic:'🥦', label:'Bio / naturale'},
+  {ic:'🌿', label:'Giardinaggio'},
+  {ic:'🛋️', label:'Casa / arredamento'},
+  {ic:'🍽️', label:'Casalinghi'},
+  {ic:'👗', label:'Abbigliamento'},
+  {ic:'👕', label:'Abbigliamento (uomo)'},
+  {ic:'🧦', label:'Intimo / calze'},
+  {ic:'👜', label:'Borse / pelletteria'},
+  {ic:'👟', label:'Scarpe'},
+  {ic:'🏅', label:'Sport'},
+  {ic:'🧸', label:'Giocattoli'},
+  {ic:'👶', label:'Bambini'},
+  {ic:'📚', label:'Libri / cartoleria'},
+  {ic:'💻', label:'Informatica'},
+  {ic:'👓', label:'Ottica'},
+  {ic:'🐾', label:'Animali'},
+  {ic:'🚗', label:'Auto / ricambi'},
+  {ic:'⛽', label:'Carburante'},
+  {ic:'🍔', label:'Ristorazione'},
+  {ic:'☕', label:'Bar / caffetteria'},
+  {ic:'🍷', label:'Enoteca'},
+  {ic:'💐', label:'Fiori'},
+  {ic:'🎮', label:'Videogiochi'},
+  {ic:'🎬', label:'Cinema / intrattenimento'},
+  {ic:'🏋️', label:'Palestra'},
+  {ic:'✈️', label:'Viaggi'},
+  {ic:'🏦', label:'Banca'},
+  {ic:'📦', label:'Shopping online'},
+  {ic:'🎁', label:'Regali'},
+  {ic:'🏷️', label:'Altro'}
+];
 
 function findPreset(nome){
   var k = (nome||'').trim().toLowerCase();
@@ -409,6 +495,22 @@ function coloreFor(nome){
   var p = findPreset(nome);
   if(p) return p.c;
   return hashColor((nome||'').trim().toLowerCase() || '?');
+}
+// Come coloreFor, ma per l'icona di categoria: prima cerca corrispondenza esatta
+// nella lista negozi noti, poi per parola-chiave contenuta nel nome digitato,
+// infine ricade sull'icona generica "Altro".
+function iconaFor(nome){
+  var p = findPreset(nome);
+  if(p && p.ic) return p.ic;
+  var k = (nome||'').trim().toLowerCase();
+  if(k){
+    var best = null, bestLen = 0;
+    STORE_HINTS.forEach(function(s){
+      if(s.ic && k.indexOf(s.hint) !== -1 && s.hint.length > bestLen){ best = s.ic; bestLen = s.hint.length; }
+    });
+    if(best) return best;
+  }
+  return '🏷️';
 }
 function inizialiFrom(nome){
   var parts = (nome||'').trim().split(/\s+/).filter(Boolean);
@@ -542,16 +644,41 @@ function refreshSwatches(){
   });
 }
 function selectColor(c){ selectedColor = c; refreshSwatches(); }
+
+var selectedIcona = null;
+function buildIconRow(){
+  var row = document.getElementById('iconRow');
+  row.innerHTML = '';
+  ICONS_PICKER.forEach(function(o){
+    var el = document.createElement('div');
+    el.className = 'icon-chip';
+    el.textContent = o.ic;
+    el.title = o.label;
+    el.dataset.ic = o.ic;
+    el.onclick = function(){ selectedIcona = o.ic; refreshIconRow(); };
+    row.appendChild(el);
+  });
+  refreshIconRow();
+}
+function refreshIconRow(){
+  document.querySelectorAll('#iconRow .icon-chip').forEach(function(el){
+    el.classList.toggle('sel', el.dataset.ic === selectedIcona);
+  });
+}
+function selectIcona(ic){ selectedIcona = ic; refreshIconRow(); }
+
 function onNomeInput(daUtente){
   if(daUtente) nomeAutoRilevato = false;
   var nome = document.getElementById('fNome').value;
   selectColor(coloreFor(nome));
+  selectIcona(iconaFor(nome));
 }
 function onNumeroInput(daUtente){
   if(daUtente) numeroAutoRilevato = false;
 }
 document.addEventListener('DOMContentLoaded', function(){
   buildSwatches();
+  buildIconRow();
   var dl = document.getElementById('storeList');
   STORE_LIST.forEach(function(s){ var o=document.createElement('option'); o.value=s.n; dl.appendChild(o); });
   renderFotoSlot('fronte');
@@ -960,6 +1087,7 @@ function resetForm(){
   renderFotoSlot('fronte');
   renderFotoSlot('retro');
   selectColor(PALETTE[0]);
+  selectIcona(ICONS_PICKER[0].ic);
 }
 
 function salvaTessera(){
@@ -974,6 +1102,7 @@ function salvaTessera(){
       d[idx].nome = nome;
       d[idx].numero = numero;
       d[idx].colore = selectedColor || coloreFor(nome);
+      d[idx].icona = selectedIcona || iconaFor(nome);
       d[idx].note = note;
       d[idx].fronte = pendingFronte;
       d[idx].retro = pendingRetro;
@@ -990,6 +1119,7 @@ function salvaTessera(){
     nome: nome,
     numero: numero,
     colore: selectedColor || coloreFor(nome),
+    icona: selectedIcona || iconaFor(nome),
     note: note,
     fronte: pendingFronte,
     retro: pendingRetro,
@@ -1021,7 +1151,9 @@ function renderTessere(){
   var html = '<div class="store-grid">';
   d.forEach(function(t){
     var col = t.colore || coloreFor(t.nome);
+    var ic = t.icona || iconaFor(t.nome);
     html += '<button class="store-tile" style="background:'+col+'" onclick="apriDettaglio(\''+t.id+'\')">' +
+      '<div class="store-tile-ico">'+ic+'</div>' +
       '<div><div class="store-tile-name">'+esc(t.nome)+'</div>' +
       (t.note ? '<div class="store-tile-note">'+esc(t.note)+'</div>' : '') +
       '</div>' +
@@ -1053,7 +1185,7 @@ function apriDettaglio(id){
   var col = t.colore || coloreFor(t.nome);
   document.getElementById('digicardTop').style.background = col;
   var badge = document.getElementById('digicardBadge');
-  badge.textContent = inizialiFrom(t.nome);
+  badge.textContent = t.icona || iconaFor(t.nome);
   badge.style.color = col;
   document.getElementById('detNome').textContent = t.nome;
   document.getElementById('detNote').textContent = t.note || '';
@@ -1127,6 +1259,7 @@ function modificaTessera(){
   mostraCaricamentoOCR(false);
   _ocrRequestId++;
   selectColor(t.colore || coloreFor(t.nome));
+  selectIcona(t.icona || iconaFor(t.nome));
   vai('inserisci');
 }
 function eliminaTessera(){
@@ -1239,6 +1372,9 @@ function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').repla
 
 // ── ABOUT / CRONOLOGIA ──
 var CHANGELOG = [
+  { v:'v23', data:'2026-08-10', voci:['Corretto: l\'apertura ora è VERAMENTE offline-first — nella v22 la cache veniva mostrata subito ma il tentativo di rete partiva comunque nello stesso istante, in parallelo. Ora il primo tentativo di rete (sia per il controllo aggiornamenti dell\'app, sia per il banner di stato connessione) parte solo 2,5 secondi DOPO l\'apertura, mai insieme: prima si vede sempre e solo la versione offline già in cache.'] },
+  { v:'v22', data:'2026-08-10', voci:['Cambiata la strategia del service worker: la pagina principale ora viene sempre servita PRIMA dalla cache (se presente), invece di aspettare la rete anche solo per una frazione di secondo — apertura istantanea in ogni condizione, fondamentale alla cassa. In parallelo, in background, l\'app scarica comunque la versione più recente per farla trovare pronta alla prossima apertura. Solo la primissima apertura in assoluto (prima ancora che ci sia qualcosa in cache) richiede la rete.'] },
+  { v:'v21', data:'2026-08-10', voci:['Nuova icona per categoria merceologica, scelta automaticamente in base al negozio (es. 🛒 supermercato, 🧰 bricolage, 📺 elettronica, 💄 profumeria...) e visibile sia nella griglia "Le mie tessere" sia nel dettaglio tessera — modificabile a mano in qualsiasi momento, anche in modifica, tra oltre 30 icone disponibili. Non sono loghi ufficiali scaricati (questioni di copyright), ma aiutano comunque a distinguere le tessere a colpo d\'occhio.','Nella griglia "Le mie tessere" la nota torna visibile come sottotitolo sotto il nome, insieme alla nuova icona.','L\'app ora si avvia SEMPRE, anche offline o con poco campo (tipico nei supermercati): il service worker aspetta la rete al massimo 2,5 secondi, poi mostra comunque la versione già salvata, invece di restare bloccata in attesa. Aggiunto anche un avviso in alto quando manca connessione, che sparisce automaticamente non appena torna.'] },
   { v:'v20', data:'2026-08-10', voci:['I messaggi di conferma (elimina tessera, svuota archivio, ripristina backup) non usano più il popup grigio nativo del browser: ora è un riquadro personalizzato, in stile app, con icona, titolo e descrizione più chiara di cosa sta per succedere.','Nella schermata della tessera, sotto i tasti "Modifica" ed "Elimina", aggiunto un tasto "Torna indietro" centrato, per tornare alla schermata precedente senza dover usare il tasto in alto.'] },
   { v:'v19', data:'2026-08-10', voci:['Pulsanti "Rileva codice a barre" e "Rileva anche nome e numero" ridisegnati: più grandi, a tutta larghezza e colorati, per essere subito riconoscibili.','Prima scansione ancora più automatica: appena si carica la foto del fronte, parte subito un tentativo lampo di lettura del codice a barre (senza aspettare l\'immagine ad alta risoluzione), seguito dalla scansione completa già presente.'] },
   { v:'v18', data:'2026-08-10', voci:['La nota ora compare anche nella griglia "Le mie tessere", sotto il nome del negozio — utile per distinguere due tessere dello stesso negozio (es. "Conad - Mamma" / "Conad - Casa").','Nella schermata della tessera, la nota è ora dentro l\'intestazione colorata, ben visibile subito sotto il nome, invece di un testo grigio anonimo più in basso.'] },
@@ -1297,6 +1433,38 @@ function chiudiConferma(esito){
 // ── INIT ──
 aggiornaHome();
 document.getElementById('creditsVersione').textContent = APP_VERSION;
+
+// ── STATO CONNESSIONE ──
+// L'app deve aprirsi SEMPRE, anche offline o con poco campo (tipico nei
+// supermercati con pareti spesse): i dati sono già tutti in locale, quindi
+// non serve la rete per usarla. Qui mostriamo solo un avviso non invasivo
+// quando manca connessione, e ricontrolliamo periodicamente per farlo
+// sparire appena torna. Usiamo un piccolo fetch di prova invece del solo
+// navigator.onLine, perché quest'ultimo può risultare "online" anche quando
+// si è collegati a un wifi/rete senza internet reale (falso positivo).
+var _connCheckTimer = null;
+function impostaStatoOffline(offline){
+  var banner = document.getElementById('offlineBanner');
+  if(banner) banner.classList.toggle('show', !!offline);
+}
+function verificaConnessioneReale(){
+  if(!navigator.onLine){ impostaStatoOffline(true); pianificaRicontrollo(); return; }
+  var ctrl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+  var timeoutId = setTimeout(function(){ if(ctrl) ctrl.abort(); }, 3000);
+  fetch('./manifest.json?_=' + Date.now(), { cache:'no-store', signal: ctrl ? ctrl.signal : undefined })
+    .then(function(){ clearTimeout(timeoutId); impostaStatoOffline(false); })
+    .catch(function(){ clearTimeout(timeoutId); impostaStatoOffline(true); pianificaRicontrollo(); });
+}
+function pianificaRicontrollo(){
+  if(_connCheckTimer) return;
+  _connCheckTimer = setTimeout(function(){ _connCheckTimer = null; verificaConnessioneReale(); }, 8000);
+}
+window.addEventListener('online', verificaConnessioneReale);
+window.addEventListener('offline', function(){ impostaStatoOffline(true); pianificaRicontrollo(); });
+// L'avvio è sempre e solo offline-first: nessun controllo di rete nello
+// stesso istante dell'apertura. Il primo controllo connessione parte solo
+// dopo 2,5 secondi, non subito.
+setTimeout(verificaConnessioneReale, 2500);
 
 // Service worker per funzionamento offline
 if ('serviceWorker' in navigator) {
