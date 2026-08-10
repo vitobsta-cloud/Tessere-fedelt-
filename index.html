@@ -293,7 +293,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#eceff1;color:#1a1a1
 <div id="toast"></div>
 
 <script>
-var APP_VERSION = 'v7';
+var APP_VERSION = 'v8';
 var DB_KEY = 'tf_db_v1';
 var MESI = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
 
@@ -398,18 +398,27 @@ function correggiCifreOCR(s){
 // Cerca il numero riga per riga (NON attraverso più righe insieme, altrimenti si rischia
 // di unire cifre sparse in punti diversi della foto in un unico numero senza senso).
 // Verificato su foto reali di codici a barre circondati da sfondi complessi.
+// Caso particolare gestito: nei codici EAN-13 la prima cifra è spesso stampata staccata
+// dal resto del blocco (è il layout standard del codice a barre) e l'OCR la legge come
+// un token a parte sulla riga precedente: se succede, viene riattaccata in testa.
 function riconosciNumero(testo){
   if(!testo) return null;
   var righe = (testo || '').split(/\r?\n/);
-  var best = '';
-  righe.forEach(function(riga){
+  var candidati = [];
+  righe.forEach(function(riga, idx){
     var t = riga.trim();
     if(!t) return;
     if(!/^[0-9OoIl][0-9OoIl \t]*[0-9OoIl]$/.test(t) && !/^[0-9OoIl]$/.test(t)) return;
-    var clean = correggiCifreOCR(t).replace(/[\s\t]+/g,'');
-    if(clean.length >= 6 && clean.length > best.length) best = clean;
+    candidati.push({ clean: correggiCifreOCR(t).replace(/[\s\t]+/g,''), idx: idx });
   });
-  return best || null;
+  var validi = candidati.filter(function(c){ return c.clean.length >= 6; });
+  if(!validi.length) return null;
+  var best = validi.reduce(function(a,b){ return b.clean.length > a.clean.length ? b : a; });
+  var prev = candidati.filter(function(c){ return c.idx === best.idx - 1; })[0];
+  if(prev && prev.clean.length <= 2){
+    best = { clean: prev.clean + best.clean, idx: best.idx };
+  }
+  return best.clean;
 }
 function formattaNumero(n){
   return (n||'').replace(/(.{4})/g,'$1 ').trim();
@@ -1007,6 +1016,7 @@ function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').repla
 
 // ── ABOUT / CRONOLOGIA ──
 var CHANGELOG = [
+  { v:'v8', data:'2026-08-10', voci:['Corretto: nei codici a barre EAN-13 la prima cifra viene spesso stampata staccata dal resto del numero (è normale, non un errore di stampa) — ora viene riconosciuta e riattaccata automaticamente, invece di andare persa.'] },
   { v:'v7', data:'2026-08-10', voci:['Riconoscimento molto più robusto: pre-elaborazione dell\'immagine (scala di grigi, contrasto, nitidezza) prima dell\'OCR, come nella versione desktop.','Doppia passata OCR: una per il nome negozio, una dedicata solo alle cifre in modalità "testo sparso" — indispensabile per leggere codici a barre su sfondi complessi.','Elenco negozi a "parola-chiave" invece di corrispondenza esatta: basta che il nome compaia nel testo, anche abbreviato.','Corretto un bug che univa cifre di punti diversi della foto in un numero senza senso; ora la ricerca resta riga per riga.'] },
   { v:'v6', data:'2026-08-10', voci:['Corretto un bug: il link della libreria di riconoscimento testo puntava a un indirizzo inesistente, quindi il riconoscimento automatico non funzionava mai.','Ora un eventuale errore di riconoscimento viene mostrato chiaramente invece di fallire in silenzio.'] },
   { v:'v5', data:'2026-08-10', voci:['Riconoscimento del negozio più tollerante (riconosce anche nomi commerciali brevi, es. "Penny" invece di "Penny Market").','Nuovo tasto "Riprova a rilevare" nella schermata Inserisci: rianalizza le foto già caricate senza doverle ricaricare.'] },
