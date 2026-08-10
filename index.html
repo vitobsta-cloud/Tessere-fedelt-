@@ -293,7 +293,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#eceff1;color:#1a1a1
 <div id="toast"></div>
 
 <script>
-var APP_VERSION = 'v5';
+var APP_VERSION = 'v6';
 var DB_KEY = 'tf_db_v1';
 var MESI = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
 
@@ -542,7 +542,7 @@ function caricaTesseract(){
   if(_tesseractLoading) return _tesseractLoading;
   _tesseractLoading = new Promise(function(resolve, reject){
     var s = document.createElement('script');
-    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.0.4/tesseract.min.js';
+    s.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
     s.onload = resolve;
     s.onerror = reject;
     document.head.appendChild(s);
@@ -610,8 +610,11 @@ function avviaRiconoscimentoOCR(dataUrl){
   hint.textContent = '🔎 Rilevamento nome e numero in corso...';
   estraiTesto(dataUrl).then(function(testo){
     mostraEsitoHint(applicaRisultatoOCR(testo, false), false);
-  }).catch(function(){
-    hint.style.display = 'none';
+  }).catch(function(err){
+    console.error('OCR error:', err);
+    hint.className = 'hint';
+    hint.style.display = 'flex';
+    hint.textContent = '⚠ Riconoscimento automatico non disponibile (verifica la connessione). Puoi inserire i dati a mano.';
   });
 }
 // Rianalizza fronte + retro insieme (tasto "Riprova"), utile quando il dato mancante
@@ -627,10 +630,11 @@ function riprovaOCR(){
   if(pendingRetro) promesse.push(estraiTesto(pendingRetro));
   Promise.all(promesse).then(function(testi){
     mostraEsitoHint(applicaRisultatoOCR(testi.join('\n'), true), true);
-  }).catch(function(){
+  }).catch(function(err){
+    console.error('OCR error:', err);
     hint.style.display = 'flex';
     hint.className = 'hint';
-    hint.textContent = '⚠ Riconoscimento non riuscito. Inserisci nome e numero a mano.';
+    hint.textContent = '⚠ Riconoscimento automatico non disponibile (verifica la connessione). Inserisci nome e numero a mano.';
   });
 }
 
@@ -886,6 +890,7 @@ function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').repla
 
 // ── ABOUT / CRONOLOGIA ──
 var CHANGELOG = [
+  { v:'v6', data:'2026-08-10', voci:['Corretto un bug: il link della libreria di riconoscimento testo puntava a un indirizzo inesistente, quindi il riconoscimento automatico non funzionava mai.','Ora un eventuale errore di riconoscimento viene mostrato chiaramente invece di fallire in silenzio.'] },
   { v:'v5', data:'2026-08-10', voci:['Riconoscimento del negozio più tollerante (riconosce anche nomi commerciali brevi, es. "Penny" invece di "Penny Market").','Nuovo tasto "Riprova a rilevare" nella schermata Inserisci: rianalizza le foto già caricate senza doverle ricaricare.'] },
   { v:'v4', data:'2026-08-10', voci:['Corretto il riconoscimento automatico: ora l\'app analizza sia la foto del fronte sia quella del retro, così trova nome e numero anche quando il codice a barre è sul retro.'] },
   { v:'v3', data:'2026-08-10', voci:['Riconoscimento automatico anche del numero tessera / codice a barre.','Nuova schermata "da mostrare alla cassa": barcode scansionabile generato dal numero, grande e pulito, senza foto in primo piano.','Foto originale della tessera spostata in una sezione secondaria richiudibile.'] },
