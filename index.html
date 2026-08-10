@@ -209,7 +209,8 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#eceff1;color:#1a1a1
 
       <div class="hint" id="ocrHint" style="display:none"></div>
       <div class="btn-row" id="ocrRetryRow" style="display:none;margin-top:2px">
-        <button type="button" class="btn btn-s" onclick="riprovaOCR()">🔄 Riprova a rilevare da foto già caricate</button>
+        <button type="button" class="btn btn-s" onclick="rilevaSoloBarcode()">📷 Rileva codice a barre</button>
+        <button type="button" class="btn btn-s" onclick="riprovaOCR()">🔄 Rileva anche nome e numero (completo)</button>
       </div>
 
       <div class="fg" style="margin-top:6px">
@@ -310,7 +311,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#eceff1;color:#1a1a1
 <div id="toast"></div>
 
 <script>
-var APP_VERSION = 'v12';
+var APP_VERSION = 'v13';
 var DB_KEY = 'tf_db_v1';
 var MESI = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
 
@@ -805,6 +806,10 @@ function eseguiScansione(forza){
 
   var myId = ++_ocrRequestId;
   mostraCaricamentoOCR(true);
+  var bannerTxt = document.querySelector('#ocrBanner .ocr-banner-txt');
+  var bannerSub = document.querySelector('#ocrBanner .ocr-banner-sub');
+  if(bannerTxt) bannerTxt.textContent = '🔎 Rilevamento nome e numero in corso…';
+  if(bannerSub) bannerSub.textContent = 'La prima volta può richiedere qualche secondo in più';
   document.getElementById('ocrHint').style.display = 'none';
 
   var immaginiOCR = [];
@@ -835,6 +840,50 @@ function eseguiScansione(forza){
   });
 }
 function riprovaOCR(){ eseguiScansione(true); }
+
+// ── Rilevamento dedicato SOLO al codice a barre: veloce (non carica/usa l'OCR pesante),
+// con messaggi specifici sul suo esito, così è chiaro se ha funzionato o no.
+function rilevaSoloBarcode(){
+  if(!pendingFronte && !pendingRetro){ toast('⚠ Carica prima almeno una foto'); return; }
+  var myId = ++_ocrRequestId;
+  mostraCaricamentoOCR(true);
+  var banner = document.querySelector('#ocrBanner .ocr-banner-txt');
+  var bannerSub = document.querySelector('#ocrBanner .ocr-banner-sub');
+  if(banner) banner.textContent = '📷 Ricerca del codice a barre in corso…';
+  if(bannerSub) bannerSub.textContent = 'Lettura diretta delle barre, non del testo stampato';
+  var hint = document.getElementById('ocrHint');
+  hint.style.display = 'none';
+
+  var immagini = [];
+  if(pendingFronte) immagini.push(pendingFronteOCR || pendingFronte);
+  if(pendingRetro) immagini.push(pendingRetroOCR || pendingRetro);
+
+  Promise.all(immagini.map(function(img){ return decodificaBarcode(img); })).then(function(risultati){
+    if(myId !== _ocrRequestId) return;
+    mostraCaricamentoOCR(false);
+    if(banner) banner.textContent = '🔎 Rilevamento nome e numero in corso…';
+    if(bannerSub) bannerSub.textContent = 'La prima volta può richiedere qualche secondo in più';
+    var trovato = risultati.filter(Boolean)[0] || null;
+    hint.style.display = 'flex';
+    if(trovato){
+      var pulito = trovato.replace(/\s+/g,'');
+      document.getElementById('fNumero').value = pulito;
+      numeroAutoRilevato = true;
+      hint.className = 'hint ok';
+      hint.textContent = '✓ Codice a barre letto: ' + formattaNumero(pulito) + ' — verifica e modifica se necessario';
+    } else {
+      hint.className = 'hint';
+      hint.textContent = '⚠ Nessun codice a barre riconosciuto in queste foto. Prova a fotografare da vicino e dritto solo la zona del codice a barre, oppure usa "Rileva anche nome e numero" per il metodo di riserva.';
+    }
+  }).catch(function(err){
+    if(myId !== _ocrRequestId) return;
+    console.error('Barcode error:', err);
+    mostraCaricamentoOCR(false);
+    hint.style.display = 'flex';
+    hint.className = 'hint';
+    hint.textContent = '⚠ Lettura del codice a barre non disponibile (verifica la connessione).';
+  });
+}
 
 function resetForm(){
   editingId = null;
@@ -1105,6 +1154,7 @@ function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').repla
 
 // ── ABOUT / CRONOLOGIA ──
 var CHANGELOG = [
+  { v:'v13', data:'2026-08-10', voci:['Nuovo tasto dedicato "Rileva codice a barre": esegue SOLO la lettura diretta del barcode (veloce, senza il peso dell\'OCR completo) con un messaggio specifico sul suo esito.','Il tasto "Rileva anche nome e numero" resta per la scansione completa (barcode + OCR di riserva + nome negozio).','Messaggi del banner più specifici a seconda di quale rilevamento è in corso.'] },
   { v:'v12', data:'2026-08-10', voci:['Novità importante: l\'app ora prova prima a leggere il codice a barre DIRETTAMENTE (come uno scanner alla cassa), invece di leggere solo le cifre stampate accanto. Molto più affidabile quando funziona: usa prima l\'API nativa del browser, poi una libreria di riserva se il telefono non la supporta. Il numero letto in questo modo viene segnalato come "alta affidabilità".','Se il codice a barre non si riesce a decodificare, l\'app torna comunque al riconoscimento delle cifre stampate come prima.'] },
   { v:'v11', data:'2026-08-10', voci:['Corretto il link della libreria che disegna il codice a barre: puntava a un percorso con maiuscole sbagliate, quindi il barcode non veniva mai generato (bug identico a quello già corretto per il riconoscimento testo).','Rimosso un tentativo di correzione automatica del numero che si è rivelato inaffidabile: in alcuni casi "sistemava" la prima cifra mancante, in altri corrompeva un numero già corretto. Ora l\'app mostra sempre il blocco di cifre più lungo trovato, senza tentativi rischiosi di unione — se manca una cifra va aggiunta a mano.','Aggiunto un avviso permanente sotto il campo numero: verificare sempre il dato con la tessera fisica prima di salvare.','Eventuali errori nella generazione del barcode ora vengono mostrati chiaramente invece di sparire in silenzio.'] },
   { v:'v10', data:'2026-08-10', voci:['Corretto un bug importante: caricando fronte e retro in sequenza, l\'app avviava due scansioni indipendenti "in corsa" tra loro, e quella sbagliata poteva sovrascrivere quella giusta arrivata prima. Ora è un\'unica scansione coordinata su entrambe le foto.','Aggiunto un banner grande e ben visibile con animazione durante il rilevamento, al posto della sola scritta piccola.'] },
