@@ -91,6 +91,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#eceff1;color:#1a1a1
 .store-tile{position:relative;aspect-ratio:8/5;border-radius:16px;border:none;cursor:pointer;font-family:inherit;overflow:hidden;box-shadow:0 3px 10px rgba(0,0,0,0.14);transition:transform .1s;display:flex;align-items:center;justify-content:center;padding:14px;}
 .store-tile:active{transform:scale(.96);}
 .store-tile-name{color:#fff;font-size:17px;font-weight:800;text-align:center;line-height:1.2;text-shadow:0 1px 3px rgba(0,0,0,0.25);word-break:break-word;}
+.store-tile-note{color:rgba(255,255,255,0.92);font-size:12px;font-weight:600;text-align:center;margin-top:4px;text-shadow:0 1px 3px rgba(0,0,0,0.25);word-break:break-word;}
 .empty-state{text-align:center;padding:50px 20px;color:#888780;}
 .empty-state .es-ico{font-size:44px;margin-bottom:14px;}
 .empty-state .es-t{font-size:15px;font-weight:600;color:#1a1a18;margin-bottom:6px;}
@@ -121,6 +122,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#eceff1;color:#1a1a1
 .digicard-top{padding:16px 18px;color:#fff;display:flex;align-items:center;gap:12px;}
 .digicard-badge{width:46px;height:46px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:16px;flex-shrink:0;box-shadow:0 1px 4px rgba(0,0,0,0.25);}
 .digicard-name{font-size:19px;font-weight:800;text-shadow:0 1px 2px rgba(0,0,0,0.2);text-align:left;flex:1;}
+.digicard-note{font-size:13px;font-weight:600;color:rgba(255,255,255,0.92);margin-top:2px;text-shadow:0 1px 2px rgba(0,0,0,0.2);}
 .digicard-body{background:#fff;padding:20px 14px 24px;text-align:center;}
 .digicard-barcode{width:100%;overflow:hidden;}
 .digicard-barcode svg{width:100%;height:auto;max-height:88px;}
@@ -249,7 +251,10 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#eceff1;color:#1a1a1
   <div class="digicard" id="digicard">
     <div class="digicard-top" id="digicardTop">
       <div class="digicard-badge" id="digicardBadge"></div>
-      <div class="digicard-name" id="detNome"></div>
+      <div style="flex:1">
+        <div class="digicard-name" id="detNome"></div>
+        <div class="digicard-note" id="detNote" style="display:none"></div>
+      </div>
     </div>
     <div class="digicard-body">
       <div id="digicardBarcodeWrap"></div>
@@ -258,7 +263,6 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#eceff1;color:#1a1a1
       </div>
     </div>
   </div>
-  <div class="det-note" id="detNote" style="text-align:center;margin-bottom:14px;color:#888780;font-size:13px;"></div>
 
   <button class="det-photo-toggle" id="detPhotoToggle" onclick="toggleFotoOriginale()">
     <span class="chev">›</span> Foto originale della tessera
@@ -316,7 +320,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#eceff1;color:#1a1a1
 <div id="toast"></div>
 
 <script>
-var APP_VERSION = 'v17';
+var APP_VERSION = 'v18';
 var DB_KEY = 'tf_db_v1';
 var MESI = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
 
@@ -994,7 +998,9 @@ function renderTessere(){
   d.forEach(function(t){
     var col = t.colore || coloreFor(t.nome);
     html += '<button class="store-tile" style="background:'+col+'" onclick="apriDettaglio(\''+t.id+'\')">' +
-      '<div class="store-tile-name">'+esc(t.nome)+'</div>' +
+      '<div><div class="store-tile-name">'+esc(t.nome)+'</div>' +
+      (t.note ? '<div class="store-tile-note">'+esc(t.note)+'</div>' : '') +
+      '</div>' +
     '</button>';
   });
   html += '</div>';
@@ -1184,6 +1190,7 @@ function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').repla
 
 // ── ABOUT / CRONOLOGIA ──
 var CHANGELOG = [
+  { v:'v18', data:'2026-08-10', voci:['La nota ora compare anche nella griglia "Le mie tessere", sotto il nome del negozio — utile per distinguere due tessere dello stesso negozio (es. "Conad - Mamma" / "Conad - Casa").','Nella schermata della tessera, la nota è ora dentro l\'intestazione colorata, ben visibile subito sotto il nome, invece di un testo grigio anonimo più in basso.'] },
   { v:'v17', data:'2026-08-10', voci:['Corretto: i codici a barre in formato UPC-A (12 cifre) venivano letti senza lo "0" iniziale che viene stampato per convenzione sulla tessera (quello zero non fa parte delle barre vere e proprie). Ora viene riaggiunto automaticamente.'] },
   { v:'v16', data:'2026-08-10', voci:['Trovata e corretta la vera causa del "resta bloccato su una versione vecchia": il browser controlla da solo se c\'è un aggiornamento solo ogni tanto (anche una volta al giorno). Ora l\'app forza il controllo subito ad ogni apertura.','Il service worker ora scarica sempre la pagina più recente dalla rete quando c\'è connessione, usando la copia salvata solo quando sei offline — prima faceva il contrario.'] },
   { v:'v15', data:'2026-08-10', voci:['Corretto: su alcuni telefoni (MIUI/Xiaomi in particolare) il menu unico apri-file nascondeva l\'opzione fotocamera. Ora ci sono due pulsanti separati e sempre garantiti: "Scatta foto" e "Dalla galleria".'] },
