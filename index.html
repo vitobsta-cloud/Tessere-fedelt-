@@ -192,6 +192,9 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#eceff1;color:#1a1a1
       </div>
 
       <div class="hint" id="ocrHint" style="display:none"></div>
+      <div class="btn-row" id="ocrRetryRow" style="display:none;margin-top:2px">
+        <button type="button" class="btn btn-s" onclick="riprovaOCR()">🔄 Riprova a rilevare da foto già caricate</button>
+      </div>
 
       <div class="fg" style="margin-top:6px">
         <label>Colore etichetta</label>
@@ -290,14 +293,14 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#eceff1;color:#1a1a1
 <div id="toast"></div>
 
 <script>
-var APP_VERSION = 'v3';
+var APP_VERSION = 'v5';
 var DB_KEY = 'tf_db_v1';
 var MESI = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
 
 // ── PALETTE ──
 var PALETTE = ['#e53935','#8e24aa','#3949ab','#1e88e5','#00897b','#43a047','#fb8c00','#6d4c41','#546e7a','#d81b60','#00acc1','#c0ca33'];
 
-// ── CATENE NOTE (nome → colore) — fonte unica per suggerimenti, colori e riconoscimento OCR ──
+// ── CATENE NOTE (nome → colore [+ alias per il riconoscimento OCR]) ──
 var STORE_LIST = [
   {n:'Esselunga', c:'#e2001a'}, {n:'Coop', c:'#c8102e'}, {n:'Conad', c:'#0033a0'},
   {n:'Carrefour', c:'#00549f'}, {n:'Lidl', c:'#0050aa'}, {n:'Eurospin', c:'#f39200'},
@@ -305,7 +308,8 @@ var STORE_LIST = [
   {n:'Auchan', c:'#e2001a'}, {n:'MD', c:'#0066b3'}, {n:'Todis', c:'#f7a600'},
   {n:'Famila', c:'#004b93'}, {n:'Crai', c:'#00a651'}, {n:'Bennet', c:'#004b8d'},
   {n:'Tigros', c:'#005baa'}, {n:"In's", c:'#e30613'}, {n:'Simply', c:'#8dc63f'},
-  {n:'Basko', c:'#0066b3'}, {n:'Ipercoop', c:'#c8102e'}, {n:'Penny Market', c:'#c8102e'},
+  {n:'Basko', c:'#0066b3'}, {n:'Ipercoop', c:'#c8102e'},
+  {n:'Penny', c:'#ed1c24', alias:['Penny Market','Pennycard','Penny Card']},
   {n:'Sisa', c:'#e30613'}, {n:'Sigma', c:'#0066b3'}, {n:'Unieuro', c:'#1a2b4a'},
   {n:'Tigotà', c:'#00a0a0'}, {n:'Il Gigante', c:'#c8102e'}, {n:'Viridea', c:'#1f6b2e'},
   {n:'BeautyStar', c:'#111111'}, {n:'OBI', c:'#f36c21'}, {n:'Action', c:'#0055a4'},
@@ -334,18 +338,28 @@ function inizialiFrom(nome){
   if(parts.length===1) return parts[0].substring(0,2).toUpperCase();
   return (parts[0][0]+parts[1][0]).toUpperCase();
 }
-// Cerca un nome negozio noto dentro un testo OCR grezzo
+// Cerca un nome negozio noto dentro un testo OCR grezzo (confronta nome, alias e parola principale)
+function pulisci(s){ return (s||'').toUpperCase().replace(/[^A-Z0-9]/g,''); }
+function parolaChiave(nome){
+  var parole = (nome||'').split(/\s+/).filter(Boolean);
+  var migliore = parole[0] || nome;
+  parole.forEach(function(p){ if(pulisci(p).length >= 4 && pulisci(p).length > pulisci(migliore).length) migliore = p; });
+  return migliore;
+}
 function riconosciNegozio(testo){
   if(!testo) return null;
-  var up = testo.toUpperCase();
-  var best = null;
+  var upClean = pulisci(testo);
+  var best = null, bestLen = 0;
   STORE_LIST.forEach(function(s){
-    if(s.n.length < 3) return; // evita match troppo corti/rumorosi (es. "MD")
-    var pat = s.n.toUpperCase().replace(/[^A-Z0-9]/g,'');
-    var upClean = up.replace(/[^A-Z0-9]/g,'');
-    if(upClean.indexOf(pat) !== -1){
-      if(!best || s.n.length > best.n.length) best = s;
-    }
+    var candidati = [s.n].concat(s.alias || []);
+    candidati.push(parolaChiave(s.n));
+    candidati.forEach(function(cand){
+      var pat = pulisci(cand);
+      if(pat.length < 3) return; // evita match troppo corti/rumorosi (es. "MD")
+      if(upClean.indexOf(pat) !== -1 && pat.length > bestLen){
+        best = s; bestLen = pat.length;
+      }
+    });
   });
   return best;
 }
@@ -483,6 +497,7 @@ function renderFotoSlot(slot){
       '</label>' +
       '<input type="file" id="'+inputId+'" accept="image/*" capture="environment" style="display:none" onchange="onFotoChange(event,\''+slot+'\')">';
   }
+  aggiornaVisibilitaRetry();
 }
 function onFotoChange(ev, slot){
   var file = ev.target.files[0];
@@ -490,12 +505,16 @@ function onFotoChange(ev, slot){
   compressImage(file, 1100, 0.82, function(dataUrl){
     if(slot==='fronte'){ pendingFronte = dataUrl; } else { pendingRetro = dataUrl; }
     renderFotoSlot(slot);
-    if(slot==='fronte') avviaRiconoscimentoOCR(dataUrl);
+    avviaRiconoscimentoOCR(dataUrl);
   });
 }
 function rimuoviFoto(slot){
   if(slot==='fronte'){ pendingFronte = null; } else { pendingRetro = null; }
   renderFotoSlot(slot);
+}
+function aggiornaVisibilitaRetry(){
+  var row = document.getElementById('ocrRetryRow');
+  if(row) row.style.display = (pendingFronte || pendingRetro) ? 'flex' : 'none';
 }
 function compressImage(file, maxW, quality, cb){
   var reader = new FileReader();
@@ -530,7 +549,56 @@ function caricaTesseract(){
   });
   return _tesseractLoading;
 }
+function estraiTesto(dataUrl){
+  return caricaTesseract().then(function(){
+    return Tesseract.recognize(dataUrl, 'ita+eng');
+  }).then(function(result){
+    return (result && result.data && result.data.text) || '';
+  });
+}
+// Applica i risultati OCR ai campi. Con forza=true (tasto "Riprova") riempie
+// qualunque campo vuoto; altrimenti rispetta i campi già scritti/rilevati a mano.
+function applicaRisultatoOCR(testo, forza){
+  var nomeAttuale = document.getElementById('fNome').value.trim();
+  var numeroAttuale = document.getElementById('fNumero').value.trim();
+  var serveNome = forza ? !nomeAttuale : (!nomeAttuale || nomeAutoRilevato);
+  var serveNumero = forza ? !numeroAttuale : (!numeroAttuale || numeroAutoRilevato);
+  var msgs = [];
+  if(serveNome){
+    var trovatoNome = riconosciNegozio(testo);
+    if(trovatoNome){
+      document.getElementById('fNome').value = trovatoNome.n;
+      nomeAutoRilevato = true;
+      selectColor(trovatoNome.c);
+      msgs.push('negozio "'+trovatoNome.n+'"');
+    }
+  }
+  if(serveNumero){
+    var trovatoNum = riconosciNumero(testo);
+    if(trovatoNum){
+      document.getElementById('fNumero').value = trovatoNum;
+      numeroAutoRilevato = true;
+      msgs.push('numero tessera');
+    }
+  }
+  return msgs;
+}
+function mostraEsitoHint(msgs, forzato){
+  var hint = document.getElementById('ocrHint');
+  if(msgs.length){
+    hint.style.display = 'flex';
+    hint.className = 'hint ok';
+    hint.textContent = '✓ Rilevati: ' + msgs.join(' e ') + ' — verifica e modifica se necessario';
+  } else if(forzato){
+    hint.style.display = 'flex';
+    hint.className = 'hint';
+    hint.textContent = 'Nessun dato aggiuntivo rilevato. Se la foto è inclinata o poco leggibile, prova a rifarla, oppure inserisci i dati a mano.';
+  } else {
+    hint.style.display = 'none';
+  }
+}
 function avviaRiconoscimentoOCR(dataUrl){
+  aggiornaVisibilitaRetry();
   var hint = document.getElementById('ocrHint');
   var nomeAttuale = document.getElementById('fNome').value.trim();
   var numeroAttuale = document.getElementById('fNumero').value.trim();
@@ -540,36 +608,29 @@ function avviaRiconoscimentoOCR(dataUrl){
   hint.style.display = 'flex';
   hint.className = 'hint';
   hint.textContent = '🔎 Rilevamento nome e numero in corso...';
-  caricaTesseract().then(function(){
-    return Tesseract.recognize(dataUrl, 'ita+eng');
-  }).then(function(result){
-    var testo = (result && result.data && result.data.text) || '';
-    var msgs = [];
-    if(serveNome){
-      var trovatoNome = riconosciNegozio(testo);
-      if(trovatoNome){
-        document.getElementById('fNome').value = trovatoNome.n;
-        nomeAutoRilevato = true;
-        selectColor(trovatoNome.c);
-        msgs.push('negozio "'+trovatoNome.n+'"');
-      }
-    }
-    if(serveNumero){
-      var trovatoNum = riconosciNumero(testo);
-      if(trovatoNum){
-        document.getElementById('fNumero').value = trovatoNum;
-        numeroAutoRilevato = true;
-        msgs.push('numero tessera');
-      }
-    }
-    if(msgs.length){
-      hint.className = 'hint ok';
-      hint.textContent = '✓ Rilevati: ' + msgs.join(' e ') + ' — verifica e modifica se necessario';
-    } else {
-      hint.style.display = 'none';
-    }
+  estraiTesto(dataUrl).then(function(testo){
+    mostraEsitoHint(applicaRisultatoOCR(testo, false), false);
   }).catch(function(){
     hint.style.display = 'none';
+  });
+}
+// Rianalizza fronte + retro insieme (tasto "Riprova"), utile quando il dato mancante
+// (es. il codice a barre) si trova sull'altra foto rispetto a quella scattata per prima.
+function riprovaOCR(){
+  if(!pendingFronte && !pendingRetro){ toast('⚠ Carica prima almeno una foto'); return; }
+  var hint = document.getElementById('ocrHint');
+  hint.style.display = 'flex';
+  hint.className = 'hint';
+  hint.textContent = '🔎 Rilevamento in corso su fronte e retro...';
+  var promesse = [];
+  if(pendingFronte) promesse.push(estraiTesto(pendingFronte));
+  if(pendingRetro) promesse.push(estraiTesto(pendingRetro));
+  Promise.all(promesse).then(function(testi){
+    mostraEsitoHint(applicaRisultatoOCR(testi.join('\n'), true), true);
+  }).catch(function(){
+    hint.style.display = 'flex';
+    hint.className = 'hint';
+    hint.textContent = '⚠ Riconoscimento non riuscito. Inserisci nome e numero a mano.';
   });
 }
 
@@ -825,6 +886,8 @@ function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').repla
 
 // ── ABOUT / CRONOLOGIA ──
 var CHANGELOG = [
+  { v:'v5', data:'2026-08-10', voci:['Riconoscimento del negozio più tollerante (riconosce anche nomi commerciali brevi, es. "Penny" invece di "Penny Market").','Nuovo tasto "Riprova a rilevare" nella schermata Inserisci: rianalizza le foto già caricate senza doverle ricaricare.'] },
+  { v:'v4', data:'2026-08-10', voci:['Corretto il riconoscimento automatico: ora l\'app analizza sia la foto del fronte sia quella del retro, così trova nome e numero anche quando il codice a barre è sul retro.'] },
   { v:'v3', data:'2026-08-10', voci:['Riconoscimento automatico anche del numero tessera / codice a barre.','Nuova schermata "da mostrare alla cassa": barcode scansionabile generato dal numero, grande e pulito, senza foto in primo piano.','Foto originale della tessera spostata in una sezione secondaria richiudibile.'] },
   { v:'v2', data:'2026-08-10', voci:['Riconoscimento automatico del nome negozio dalla foto (modificabile a mano).','Foto fronte e retro tessera.','Nuova vista "Le mie tessere" con schede colorate in stile app di pagamento.'] },
   { v:'v1', data:'2026-08-10', voci:['Prima versione: inserimento tessere con foto, elenco con loghi colorati, backup JSON.'] }
