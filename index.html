@@ -57,6 +57,12 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#eceff1;color:#1a1a1
 .sec-lbl{font-size:11px;font-weight:600;color:#5f5e5a;text-transform:uppercase;letter-spacing:.5px;padding-bottom:8px;border-bottom:1px solid #eee;margin-bottom:10px;margin-top:14px;}
 .hint{font-size:11.5px;color:#888;margin-top:4px;display:flex;align-items:center;gap:5px;}
 .hint.ok{color:#2d6a2d;}
+.ocr-banner{display:none;align-items:center;gap:12px;background:#eaf2fd;border:1.5px solid #a9cdf5;border-radius:12px;padding:14px 16px;margin-bottom:14px;}
+.ocr-banner.show{display:flex;}
+.ocr-banner-txt{font-size:14.5px;font-weight:700;color:#154a8a;line-height:1.35;}
+.ocr-banner-sub{font-size:12px;font-weight:400;color:#3a6bab;margin-top:2px;}
+.ocr-spinner{width:24px;height:24px;border:3px solid #bcdcfa;border-top-color:#1a5bb8;border-radius:50%;animation:ocrspin .8s linear infinite;flex-shrink:0;}
+@keyframes ocrspin{to{transform:rotate(360deg);}}
 
 /* BUTTONS */
 .btn{padding:10px 20px;border-radius:8px;border:1px solid #d3d1c7;font-size:14px;font-weight:500;cursor:pointer;font-family:inherit;background:#fff;color:#1a1a18;transition:all .15s;}
@@ -174,6 +180,14 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#eceff1;color:#1a1a1
   <div class="panel">
     <div class="ph"><h2>Nuova tessera</h2></div>
     <div class="pb">
+
+      <div class="ocr-banner" id="ocrBanner">
+        <div class="ocr-spinner"></div>
+        <div>
+          <div class="ocr-banner-txt">🔎 Rilevamento nome e numero in corso…</div>
+          <div class="ocr-banner-sub">La prima volta può richiedere qualche secondo in più</div>
+        </div>
+      </div>
 
       <div class="sec-lbl" style="margin-top:0">Fronte tessera</div>
       <div class="foto-block" id="fotoAreaFronte"></div>
@@ -295,7 +309,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#eceff1;color:#1a1a1
 <div id="toast"></div>
 
 <script>
-var APP_VERSION = 'v9';
+var APP_VERSION = 'v10';
 var DB_KEY = 'tf_db_v1';
 var MESI = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
 
@@ -561,7 +575,7 @@ function onFotoChange(ev, slot){
   // i dettagli piccoli (numeri, codice a barre) si leggono molto meglio a piena definizione.
   compressImage(file, 2000, 0.94, function(dataUrlHQ){
     if(slot==='fronte'){ pendingFronteOCR = dataUrlHQ; } else { pendingRetroOCR = dataUrlHQ; }
-    avviaRiconoscimentoOCR(dataUrlHQ);
+    eseguiScansione(false);
   });
 }
 function rimuoviFoto(slot){
@@ -721,50 +735,54 @@ function mostraEsitoHint(msgs, forzato){
     hint.style.display = 'none';
   }
 }
-function avviaRiconoscimentoOCR(dataUrl){
+function mostraCaricamentoOCR(attivo){
+  var banner = document.getElementById('ocrBanner');
+  if(banner) banner.classList.toggle('show', !!attivo);
+}
+// ── Scansione unificata: analizza SEMPRE fronte + retro insieme in un'unica passata.
+// Evita il bug delle due scansioni "in corsa" (una per foto) che potevano sovrascriversi
+// a vicenda a seconda di quale finiva per ultima. Ogni chiamata riceve un id progressivo:
+// se nel frattempo ne parte una più recente, il risultato di quella vecchia viene scartato.
+var _ocrRequestId = 0;
+function eseguiScansione(forza){
+  if(!pendingFronte && !pendingRetro){
+    if(forza) toast('⚠ Carica prima almeno una foto');
+    return;
+  }
   aggiornaVisibilitaRetry();
-  var hint = document.getElementById('ocrHint');
   var nomeAttuale = document.getElementById('fNome').value.trim();
   var numeroAttuale = document.getElementById('fNumero').value.trim();
-  var serveNome = !nomeAttuale || nomeAutoRilevato;
-  var serveNumero = !numeroAttuale || numeroAutoRilevato;
+  var serveNome = forza ? true : (!nomeAttuale || nomeAutoRilevato);
+  var serveNumero = forza ? true : (!numeroAttuale || numeroAutoRilevato);
   if(!serveNome && !serveNumero) return;
-  hint.style.display = 'flex';
-  hint.className = 'hint';
-  hint.textContent = '🔎 Rilevamento nome e numero in corso...';
-  estraiTesto(dataUrl).then(function(testo){
-    mostraEsitoHint(applicaRisultatoOCR(testo, false), false);
-  }).catch(function(err){
-    console.error('OCR error:', err);
-    hint.className = 'hint';
-    hint.style.display = 'flex';
-    hint.textContent = '⚠ Riconoscimento automatico non disponibile (verifica la connessione). Puoi inserire i dati a mano.';
-  });
-}
-// Rianalizza fronte + retro insieme (tasto "Riprova"), utile quando il dato mancante
-// (es. il codice a barre) si trova sull'altra foto rispetto a quella scattata per prima.
-function riprovaOCR(){
-  if(!pendingFronte && !pendingRetro){ toast('⚠ Carica prima almeno una foto'); return; }
-  var hint = document.getElementById('ocrHint');
-  hint.style.display = 'flex';
-  hint.className = 'hint';
-  hint.textContent = '🔎 Rilevamento in corso su fronte e retro...';
+
+  var myId = ++_ocrRequestId;
+  mostraCaricamentoOCR(true);
+  document.getElementById('ocrHint').style.display = 'none';
+
   var promesse = [];
   if(pendingFronte) promesse.push(estraiTesto(pendingFronteOCR || pendingFronte));
   if(pendingRetro) promesse.push(estraiTesto(pendingRetroOCR || pendingRetro));
+
   Promise.all(promesse).then(function(risultati){
+    if(myId !== _ocrRequestId) return; // superata da una scansione più recente: ignora
+    mostraCaricamentoOCR(false);
     var combinato = {
       nome: risultati.map(function(r){ return r.nome; }).join('\n'),
       numero: risultati.map(function(r){ return r.numero; }).join('\n')
     };
-    mostraEsitoHint(applicaRisultatoOCR(combinato, true), true);
+    mostraEsitoHint(applicaRisultatoOCR(combinato, forza), forza);
   }).catch(function(err){
+    if(myId !== _ocrRequestId) return;
     console.error('OCR error:', err);
+    mostraCaricamentoOCR(false);
+    var hint = document.getElementById('ocrHint');
     hint.style.display = 'flex';
     hint.className = 'hint';
     hint.textContent = '⚠ Riconoscimento automatico non disponibile (verifica la connessione). Inserisci nome e numero a mano.';
   });
 }
+function riprovaOCR(){ eseguiScansione(true); }
 
 function resetForm(){
   editingId = null;
@@ -772,10 +790,14 @@ function resetForm(){
   document.getElementById('fNumero').value = '';
   document.getElementById('fNote').value = '';
   document.getElementById('ocrHint').style.display = 'none';
+  mostraCaricamentoOCR(false);
+  _ocrRequestId++; // annulla eventuali scansioni ancora in corso della tessera precedente
   nomeAutoRilevato = false;
   numeroAutoRilevato = false;
   pendingFronte = null;
   pendingRetro = null;
+  pendingFronteOCR = null;
+  pendingRetroOCR = null;
   renderFotoSlot('fronte');
   renderFotoSlot('retro');
   selectColor(PALETTE[0]);
@@ -933,6 +955,8 @@ function modificaTessera(){
   renderFotoSlot('fronte');
   renderFotoSlot('retro');
   document.getElementById('ocrHint').style.display = 'none';
+  mostraCaricamentoOCR(false);
+  _ocrRequestId++;
   selectColor(t.colore || coloreFor(t.nome));
   vai('inserisci');
 }
@@ -1021,6 +1045,7 @@ function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').repla
 
 // ── ABOUT / CRONOLOGIA ──
 var CHANGELOG = [
+  { v:'v10', data:'2026-08-10', voci:['Corretto un bug importante: caricando fronte e retro in sequenza, l\'app avviava due scansioni indipendenti "in corsa" tra loro, e quella sbagliata poteva sovrascrivere quella giusta arrivata prima. Ora è un\'unica scansione coordinata su entrambe le foto.','Aggiunto un banner grande e ben visibile con animazione durante il rilevamento, al posto della sola scritta piccola.'] },
   { v:'v9', data:'2026-08-10', voci:['Intestazione della card "da mostrare alla cassa" ridisegnata: cerchietto con le iniziali del negozio accanto al nome, in stile app di pagamento/wallet.'] },
   { v:'v8', data:'2026-08-10', voci:['Corretto: nei codici a barre EAN-13 la prima cifra viene spesso stampata staccata dal resto del numero (è normale, non un errore di stampa) — ora viene riconosciuta e riattaccata automaticamente, invece di andare persa.'] },
   { v:'v7', data:'2026-08-10', voci:['Riconoscimento molto più robusto: pre-elaborazione dell\'immagine (scala di grigi, contrasto, nitidezza) prima dell\'OCR, come nella versione desktop.','Doppia passata OCR: una per il nome negozio, una dedicata solo alle cifre in modalità "testo sparso" — indispensabile per leggere codici a barre su sfondi complessi.','Elenco negozi a "parola-chiave" invece di corrispondenza esatta: basta che il nome compaia nel testo, anche abbreviato.','Corretto un bug che univa cifre di punti diversi della foto in un numero senza senso; ora la ricerca resta riga per riga.'] },
