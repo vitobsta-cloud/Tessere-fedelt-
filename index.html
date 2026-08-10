@@ -204,6 +204,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#eceff1;color:#1a1a1
       <div class="fg">
         <label>Numero tessera / codice a barre</label>
         <input type="text" id="fNumero" inputmode="numeric" placeholder="es. 8001234567890" oninput="onNumeroInput(true)" autocomplete="off">
+        <div style="font-size:11px;color:#999;margin-top:2px;">Il rilevamento automatico è un aiuto, non infallibile: confronta sempre il numero con quello stampato sulla tessera prima di salvare.</div>
       </div>
 
       <div class="hint" id="ocrHint" style="display:none"></div>
@@ -309,7 +310,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#eceff1;color:#1a1a1
 <div id="toast"></div>
 
 <script>
-var APP_VERSION = 'v10';
+var APP_VERSION = 'v12';
 var DB_KEY = 'tf_db_v1';
 var MESI = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
 
@@ -411,30 +412,25 @@ function riconosciNegozio(testo){
 function correggiCifreOCR(s){
   return (s||'').replace(/[Oo]/g,'0').replace(/[Il]/g,'1');
 }
-// Cerca il numero riga per riga (NON attraverso più righe insieme, altrimenti si rischia
+// Cerca il numero token per token (NON attraverso più token insieme, altrimenti si rischia
 // di unire cifre sparse in punti diversi della foto in un unico numero senza senso).
-// Verificato su foto reali di codici a barre circondati da sfondi complessi.
-// Caso particolare gestito: nei codici EAN-13 la prima cifra è spesso stampata staccata
-// dal resto del blocco (è il layout standard del codice a barre) e l'OCR la legge come
-// un token a parte sulla riga precedente: se succede, viene riattaccata in testa.
+// Sceglie il blocco di cifre più lungo trovato. NON tenta di "indovinare" e riattaccare
+// cifre isolate vicine: un tentativo del genere è stato provato e si è rivelato
+// inaffidabile (a volte corregge, a volte corrompe un numero già giusto attaccandogli
+// rumore casuale). Meglio un numero quasi sempre corretto e verificabile a colpo d'occhio,
+// che uno "quasi giusto ma a volte sbagliato in modo silenzioso".
 function riconosciNumero(testo){
   if(!testo) return null;
   var righe = (testo || '').split(/\r?\n/);
-  var candidati = [];
-  righe.forEach(function(riga, idx){
+  var best = '';
+  righe.forEach(function(riga){
     var t = riga.trim();
     if(!t) return;
     if(!/^[0-9OoIl][0-9OoIl \t]*[0-9OoIl]$/.test(t) && !/^[0-9OoIl]$/.test(t)) return;
-    candidati.push({ clean: correggiCifreOCR(t).replace(/[\s\t]+/g,''), idx: idx });
+    var clean = correggiCifreOCR(t).replace(/[\s\t]+/g,'');
+    if(clean.length >= 6 && clean.length > best.length) best = clean;
   });
-  var validi = candidati.filter(function(c){ return c.clean.length >= 6; });
-  if(!validi.length) return null;
-  var best = validi.reduce(function(a,b){ return b.clean.length > a.clean.length ? b : a; });
-  var prev = candidati.filter(function(c){ return c.idx === best.idx - 1; })[0];
-  if(prev && prev.clean.length <= 2){
-    best = { clean: prev.clean + best.clean, idx: best.idx };
-  }
-  return best.clean;
+  return best || null;
 }
 function formattaNumero(n){
   return (n||'').replace(/(.{4})/g,'$1 ').trim();
@@ -693,10 +689,60 @@ function estraiTesto(dataUrl){
     });
   });
 }
+// ── LETTURA DIRETTA DEL CODICE A BARRE (molto più affidabile dell'OCR sulle cifre stampate:
+// legge le barre stesse, come uno scanner alla cassa, invece di leggere testo piccolo) ──
+function caricaImgEl(dataUrl){
+  return new Promise(function(resolve, reject){
+    var img = new Image();
+    img.onload = function(){ resolve(img); };
+    img.onerror = reject;
+    img.src = dataUrl;
+  });
+}
+var _zxingLoading = null;
+function caricaZXing(){
+  if(window.ZXing) return Promise.resolve();
+  if(_zxingLoading) return _zxingLoading;
+  _zxingLoading = new Promise(function(resolve, reject){
+    var s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3';
+    s.onload = resolve;
+    s.onerror = reject;
+    document.head.appendChild(s);
+  });
+  return _zxingLoading;
+}
+// Prova prima l'API nativa del browser (veloce, integrata, ottimo supporto su Chrome/Android);
+// se non disponibile o non trova nulla, usa una libreria di decodifica come riserva.
+function decodificaBarcode(dataUrl){
+  var formatiUtili = ['ean_13','ean_8','upc_a','upc_e','code_128','code_39','codabar','itf'];
+  var provaNativo = ('BarcodeDetector' in window)
+    ? window.BarcodeDetector.getSupportedFormats().then(function(supportati){
+        var formati = formatiUtili.filter(function(f){ return supportati.indexOf(f) !== -1; });
+        if(!formati.length) return null;
+        var detector = new window.BarcodeDetector({ formats: formati });
+        return caricaImgEl(dataUrl).then(function(img){ return detector.detect(img); });
+      }).then(function(risultati){
+        return (risultati && risultati.length) ? risultati[0].rawValue : null;
+      }).catch(function(){ return null; })
+    : Promise.resolve(null);
+
+  return provaNativo.then(function(valore){
+    if(valore) return valore;
+    // Riserva: libreria ZXing, funziona anche dove l'API nativa non è supportata
+    return caricaZXing().then(function(){
+      var reader = new ZXing.BrowserMultiFormatReader();
+      return reader.decodeFromImageUrl(dataUrl).then(function(res){ return res.getText(); });
+    }).catch(function(){ return null; });
+  });
+}
+
 // Applica i risultati OCR ai campi. "risultato" è {nome, numero} (testi delle due passate).
+// "barcodeValue", se presente, viene sempre preferito per il numero perché letto
+// direttamente dal codice a barre, non da cifre stampate ricostruite dall'OCR.
 // Con forza=true (tasto "Riprova") riempie qualunque campo vuoto; altrimenti rispetta
 // i campi già scritti/rilevati a mano.
-function applicaRisultatoOCR(risultato, forza){
+function applicaRisultatoOCR(risultato, forza, barcodeValue){
   var nomeAttuale = document.getElementById('fNome').value.trim();
   var numeroAttuale = document.getElementById('fNumero').value.trim();
   var serveNome = forza ? !nomeAttuale : (!nomeAttuale || nomeAutoRilevato);
@@ -712,11 +758,12 @@ function applicaRisultatoOCR(risultato, forza){
     }
   }
   if(serveNumero){
-    var trovatoNum = riconosciNumero(risultato.numero) || riconosciNumero(risultato.nome);
+    var daBarcode = !!(barcodeValue && barcodeValue.replace(/\D/g,'').length >= 4);
+    var trovatoNum = daBarcode ? barcodeValue.replace(/\s+/g,'') : (riconosciNumero(risultato.numero) || riconosciNumero(risultato.nome));
     if(trovatoNum){
       document.getElementById('fNumero').value = trovatoNum;
       numeroAutoRilevato = true;
-      msgs.push('numero tessera');
+      msgs.push(daBarcode ? 'numero tessera (letto dal codice a barre — alta affidabilità)' : 'numero tessera');
     }
   }
   return msgs;
@@ -760,18 +807,23 @@ function eseguiScansione(forza){
   mostraCaricamentoOCR(true);
   document.getElementById('ocrHint').style.display = 'none';
 
-  var promesse = [];
-  if(pendingFronte) promesse.push(estraiTesto(pendingFronteOCR || pendingFronte));
-  if(pendingRetro) promesse.push(estraiTesto(pendingRetroOCR || pendingRetro));
+  var immaginiOCR = [];
+  if(pendingFronte) immaginiOCR.push(pendingFronteOCR || pendingFronte);
+  if(pendingRetro) immaginiOCR.push(pendingRetroOCR || pendingRetro);
 
-  Promise.all(promesse).then(function(risultati){
+  var promesseTesto = immaginiOCR.map(function(img){ return estraiTesto(img); });
+  var promesseBarcode = immaginiOCR.map(function(img){ return decodificaBarcode(img); });
+
+  Promise.all([Promise.all(promesseTesto), Promise.all(promesseBarcode)]).then(function(risultati){
     if(myId !== _ocrRequestId) return; // superata da una scansione più recente: ignora
     mostraCaricamentoOCR(false);
+    var testi = risultati[0];
+    var barcodeTrovato = risultati[1].filter(Boolean)[0] || null;
     var combinato = {
-      nome: risultati.map(function(r){ return r.nome; }).join('\n'),
-      numero: risultati.map(function(r){ return r.numero; }).join('\n')
+      nome: testi.map(function(r){ return r.nome; }).join('\n'),
+      numero: testi.map(function(r){ return r.numero; }).join('\n')
     };
-    mostraEsitoHint(applicaRisultatoOCR(combinato, forza), forza);
+    mostraEsitoHint(applicaRisultatoOCR(combinato, forza, barcodeTrovato), forza);
   }).catch(function(err){
     if(myId !== _ocrRequestId) return;
     console.error('OCR error:', err);
@@ -877,7 +929,7 @@ function caricaJsBarcode(){
   if(_jsbarcodeLoading) return _jsbarcodeLoading;
   _jsbarcodeLoading = new Promise(function(resolve, reject){
     var s = document.createElement('script');
-    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/JsBarcode/3.11.5/JsBarcode.all.min.js';
+    s.src = 'https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js';
     s.onload = resolve;
     s.onerror = reject;
     document.head.appendChild(s);
@@ -907,8 +959,16 @@ function apriDettaglio(id){
     caricaJsBarcode().then(function(){
       try{
         JsBarcode('#digicardSvg', _numeroCorrente, { format:'CODE128', displayValue:false, margin:6, height:70 });
-      }catch(e){ document.getElementById('digicardSvg').outerHTML = ''; }
-    }).catch(function(){});
+      }catch(e){
+        console.error('JsBarcode error:', e);
+        var svgEl = document.getElementById('digicardSvg');
+        if(svgEl) svgEl.outerHTML = '<div style="font-size:12px;color:#a32d2d;padding:8px 0;">⚠ Impossibile generare il codice a barre da questo numero.</div>';
+      }
+    }).catch(function(err){
+      console.error('JsBarcode load error:', err);
+      var svgEl = document.getElementById('digicardSvg');
+      if(svgEl) svgEl.outerHTML = '<div style="font-size:12px;color:#a32d2d;padding:8px 0;">⚠ Codice a barre non disponibile (verifica la connessione).</div>';
+    });
   } else {
     bcWrap.innerHTML = '<div class="digicard-noNum">Nessun numero tessera salvato.<br>Tocca "Modifica" per aggiungerlo.</div>';
     copyWrap.style.display = 'none';
@@ -1045,6 +1105,8 @@ function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').repla
 
 // ── ABOUT / CRONOLOGIA ──
 var CHANGELOG = [
+  { v:'v12', data:'2026-08-10', voci:['Novità importante: l\'app ora prova prima a leggere il codice a barre DIRETTAMENTE (come uno scanner alla cassa), invece di leggere solo le cifre stampate accanto. Molto più affidabile quando funziona: usa prima l\'API nativa del browser, poi una libreria di riserva se il telefono non la supporta. Il numero letto in questo modo viene segnalato come "alta affidabilità".','Se il codice a barre non si riesce a decodificare, l\'app torna comunque al riconoscimento delle cifre stampate come prima.'] },
+  { v:'v11', data:'2026-08-10', voci:['Corretto il link della libreria che disegna il codice a barre: puntava a un percorso con maiuscole sbagliate, quindi il barcode non veniva mai generato (bug identico a quello già corretto per il riconoscimento testo).','Rimosso un tentativo di correzione automatica del numero che si è rivelato inaffidabile: in alcuni casi "sistemava" la prima cifra mancante, in altri corrompeva un numero già corretto. Ora l\'app mostra sempre il blocco di cifre più lungo trovato, senza tentativi rischiosi di unione — se manca una cifra va aggiunta a mano.','Aggiunto un avviso permanente sotto il campo numero: verificare sempre il dato con la tessera fisica prima di salvare.','Eventuali errori nella generazione del barcode ora vengono mostrati chiaramente invece di sparire in silenzio.'] },
   { v:'v10', data:'2026-08-10', voci:['Corretto un bug importante: caricando fronte e retro in sequenza, l\'app avviava due scansioni indipendenti "in corsa" tra loro, e quella sbagliata poteva sovrascrivere quella giusta arrivata prima. Ora è un\'unica scansione coordinata su entrambe le foto.','Aggiunto un banner grande e ben visibile con animazione durante il rilevamento, al posto della sola scritta piccola.'] },
   { v:'v9', data:'2026-08-10', voci:['Intestazione della card "da mostrare alla cassa" ridisegnata: cerchietto con le iniziali del negozio accanto al nome, in stile app di pagamento/wallet.'] },
   { v:'v8', data:'2026-08-10', voci:['Corretto: nei codici a barre EAN-13 la prima cifra viene spesso stampata staccata dal resto del numero (è normale, non un errore di stampa) — ora viene riconosciuta e riattaccata automaticamente, invece di andare persa.'] },
