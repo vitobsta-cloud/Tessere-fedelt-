@@ -74,6 +74,14 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#eceff1;color:#1a1a1
 .btn-s{padding:7px 14px;font-size:12px;}
 .btn-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;}
 
+/* Pulsanti di rilevamento automatico: più grandi e ben visibili, a tutta larghezza */
+.btn-scan{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:13px 16px;border-radius:10px;font-size:14.5px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .15s;border:none;}
+.btn-scan-barcode{background:#eaf2fd;color:#154a8a;border:1.5px solid #a9cdf5;}
+.btn-scan-barcode:hover{background:#d9e9fc;}
+.btn-scan-full{background:#1a5bb8;color:#fff;box-shadow:0 2px 6px rgba(26,91,184,.35);}
+.btn-scan-full:hover{background:#154a8a;}
+.ocr-retry-row{flex-direction:column;gap:10px;}
+
 /* SETTINGS */
 .set-row{display:flex;align-items:center;justify-content:space-between;padding:13px 0;border-bottom:1px solid #f0efeb;gap:10px;}
 .set-row:last-child{border-bottom:none;}
@@ -215,9 +223,9 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#eceff1;color:#1a1a1
       </div>
 
       <div class="hint" id="ocrHint" style="display:none"></div>
-      <div class="btn-row" id="ocrRetryRow" style="display:none;margin-top:2px">
-        <button type="button" class="btn btn-s" onclick="rilevaSoloBarcode()">📷 Rileva codice a barre</button>
-        <button type="button" class="btn btn-s" onclick="riprovaOCR()">🔄 Rileva anche nome e numero (completo)</button>
+      <div class="btn-row ocr-retry-row" id="ocrRetryRow" style="display:none;margin-top:6px">
+        <button type="button" class="btn-scan btn-scan-full" onclick="riprovaOCR()">🔄 Rileva anche nome e numero (completo)</button>
+        <button type="button" class="btn-scan btn-scan-barcode" onclick="rilevaSoloBarcode()">📷 Rileva codice a barre</button>
       </div>
 
       <div class="fg" style="margin-top:6px">
@@ -320,7 +328,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#eceff1;color:#1a1a1
 <div id="toast"></div>
 
 <script>
-var APP_VERSION = 'v18';
+var APP_VERSION = 'v19';
 var DB_KEY = 'tf_db_v1';
 var MESI = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
 
@@ -584,6 +592,19 @@ function onFotoChange(ev, slot){
   compressImage(file, 1100, 0.82, function(dataUrl){
     if(slot==='fronte'){ pendingFronte = dataUrl; } else { pendingRetro = dataUrl; }
     renderFotoSlot(slot);
+    // Scansione automatica IMMEDIATA (prima scansione): appena la foto è disponibile,
+    // tenta subito la lettura del codice a barre senza aspettare la versione ad alta
+    // risoluzione, così l'utente vede un risultato il prima possibile senza dover
+    // toccare alcun pulsante.
+    var numeroAttualeQuick = document.getElementById('fNumero').value.trim();
+    if(!numeroAttualeQuick || numeroAutoRilevato){
+      decodificaBarcode(dataUrl).then(function(val){
+        if(val && !document.getElementById('fNumero').value.trim()){
+          document.getElementById('fNumero').value = val.replace(/\s+/g,'');
+          numeroAutoRilevato = true;
+        }
+      }).catch(function(){});
+    }
   });
   // Copia separata ad alta risoluzione, usata SOLO per il riconoscimento testo:
   // i dettagli piccoli (numeri, codice a barre) si leggono molto meglio a piena definizione.
@@ -1190,6 +1211,7 @@ function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').repla
 
 // ── ABOUT / CRONOLOGIA ──
 var CHANGELOG = [
+  { v:'v19', data:'2026-08-10', voci:['Pulsanti "Rileva codice a barre" e "Rileva anche nome e numero" ridisegnati: più grandi, a tutta larghezza e colorati, per essere subito riconoscibili.','Prima scansione ancora più automatica: appena si carica la foto del fronte, parte subito un tentativo lampo di lettura del codice a barre (senza aspettare l\'immagine ad alta risoluzione), seguito dalla scansione completa già presente.'] },
   { v:'v18', data:'2026-08-10', voci:['La nota ora compare anche nella griglia "Le mie tessere", sotto il nome del negozio — utile per distinguere due tessere dello stesso negozio (es. "Conad - Mamma" / "Conad - Casa").','Nella schermata della tessera, la nota è ora dentro l\'intestazione colorata, ben visibile subito sotto il nome, invece di un testo grigio anonimo più in basso.'] },
   { v:'v17', data:'2026-08-10', voci:['Corretto: i codici a barre in formato UPC-A (12 cifre) venivano letti senza lo "0" iniziale che viene stampato per convenzione sulla tessera (quello zero non fa parte delle barre vere e proprie). Ora viene riaggiunto automaticamente.'] },
   { v:'v16', data:'2026-08-10', voci:['Trovata e corretta la vera causa del "resta bloccato su una versione vecchia": il browser controlla da solo se c\'è un aggiornamento solo ogni tanto (anche una volta al giorno). Ora l\'app forza il controllo subito ad ogni apertura.','Il service worker ora scarica sempre la pagina più recente dalla rete quando c\'è connessione, usando la copia salvata solo quando sei offline — prima faceva il contrario.'] },
