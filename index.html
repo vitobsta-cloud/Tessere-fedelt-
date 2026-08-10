@@ -311,7 +311,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#eceff1;color:#1a1a1
 <div id="toast"></div>
 
 <script>
-var APP_VERSION = 'v13';
+var APP_VERSION = 'v14';
 var DB_KEY = 'tf_db_v1';
 var MESI = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
 
@@ -550,13 +550,13 @@ function renderFotoSlot(slot){
         '<button type="button" class="foto-remove" onclick="rimuoviFoto(\''+slot+'\')">✕</button>' +
       '</div>';
   } else {
-    var testo = slot==='fronte' ? 'Scatta o carica la foto del fronte' : 'Scatta o carica la foto del retro';
+    var testo = slot==='fronte' ? 'Scatta una foto o scegli dalla galleria (fronte)' : 'Scatta una foto o scegli dalla galleria (retro)';
     area.innerHTML =
       '<label class="foto-wrap" for="'+inputId+'">' +
         '<div class="fw-ico">📷</div>' +
         '<div class="fw-t">'+testo+'</div>' +
       '</label>' +
-      '<input type="file" id="'+inputId+'" accept="image/*" capture="environment" style="display:none" onchange="onFotoChange(event,\''+slot+'\')">';
+      '<input type="file" id="'+inputId+'" accept="image/*" style="display:none" onchange="onFotoChange(event,\''+slot+'\')">';
   }
   aggiornaVisibilitaRetry();
 }
@@ -659,34 +659,32 @@ function preelaboraPerOCR(dataUrl, cb){
   img.onerror = function(){ cb(dataUrl); }; // in caso di problemi, tenta comunque con l'originale
   img.src = dataUrl;
 }
-function estraiTesto(dataUrl){
-  // Due passate separate sulla stessa immagine pre-elaborata:
-  // 1) blocco di testo (psm 6) → buona per il nome del negozio
-  // 2) testo sparso + sole cifre (psm 11) → indispensabile per leggere il numero/codice
-  //    a barre quando è circondato da sfondi complessi (verificato su foto reali)
+// Due passate OCR separate e indipendenti sulla stessa immagine pre-elaborata:
+// 1) blocco di testo (psm 6) → per il nome del negozio — separata per poterla ripetere
+//    da sola più volte senza rifare anche la passata (più lenta) sulle cifre.
+// 2) testo sparso + sole cifre (psm 11) → per il numero, usata solo come riserva
+//    quando la lettura diretta del codice a barre non trova nulla.
+function estraiTestoNome(dataUrl){
   return new Promise(function(resolve, reject){
     preelaboraPerOCR(dataUrl, function(dataUrlPulito){
       var worker;
-      caricaTesseract().then(function(){
-        return Tesseract.createWorker('ita+eng');
-      }).then(function(w){
-        worker = w;
-        return worker.setParameters({ tessedit_pageseg_mode: '6' });
-      }).then(function(){
-        return worker.recognize(dataUrlPulito);
-      }).then(function(risNome){
-        var testoNome = (risNome && risNome.data && risNome.data.text) || '';
-        return worker.setParameters({ tessedit_pageseg_mode: '11', tessedit_char_whitelist: '0123456789' })
-          .then(function(){ return worker.recognize(dataUrlPulito); })
-          .then(function(risNum){
-            var testoNumero = (risNum && risNum.data && risNum.data.text) || '';
-            worker.terminate();
-            resolve({ nome: testoNome, numero: testoNumero });
-          });
-      }).catch(function(err){
-        if(worker) worker.terminate();
-        reject(err);
-      });
+      caricaTesseract().then(function(){ return Tesseract.createWorker('ita+eng'); })
+        .then(function(w){ worker = w; return worker.setParameters({ tessedit_pageseg_mode: '6' }); })
+        .then(function(){ return worker.recognize(dataUrlPulito); })
+        .then(function(ris){ worker.terminate(); resolve((ris && ris.data && ris.data.text) || ''); })
+        .catch(function(err){ if(worker) worker.terminate(); reject(err); });
+    });
+  });
+}
+function estraiTestoNumero(dataUrl){
+  return new Promise(function(resolve, reject){
+    preelaboraPerOCR(dataUrl, function(dataUrlPulito){
+      var worker;
+      caricaTesseract().then(function(){ return Tesseract.createWorker('eng'); })
+        .then(function(w){ worker = w; return worker.setParameters({ tessedit_pageseg_mode: '11', tessedit_char_whitelist: '0123456789' }); })
+        .then(function(){ return worker.recognize(dataUrlPulito); })
+        .then(function(ris){ worker.terminate(); resolve((ris && ris.data && ris.data.text) || ''); })
+        .catch(function(err){ if(worker) worker.terminate(); reject(err); });
     });
   });
 }
@@ -738,37 +736,6 @@ function decodificaBarcode(dataUrl){
   });
 }
 
-// Applica i risultati OCR ai campi. "risultato" è {nome, numero} (testi delle due passate).
-// "barcodeValue", se presente, viene sempre preferito per il numero perché letto
-// direttamente dal codice a barre, non da cifre stampate ricostruite dall'OCR.
-// Con forza=true (tasto "Riprova") riempie qualunque campo vuoto; altrimenti rispetta
-// i campi già scritti/rilevati a mano.
-function applicaRisultatoOCR(risultato, forza, barcodeValue){
-  var nomeAttuale = document.getElementById('fNome').value.trim();
-  var numeroAttuale = document.getElementById('fNumero').value.trim();
-  var serveNome = forza ? !nomeAttuale : (!nomeAttuale || nomeAutoRilevato);
-  var serveNumero = forza ? !numeroAttuale : (!numeroAttuale || numeroAutoRilevato);
-  var msgs = [];
-  if(serveNome){
-    var trovatoNome = riconosciNegozio(risultato.nome);
-    if(trovatoNome){
-      document.getElementById('fNome').value = trovatoNome.n;
-      nomeAutoRilevato = true;
-      selectColor(trovatoNome.c);
-      msgs.push('negozio "'+trovatoNome.n+'"');
-    }
-  }
-  if(serveNumero){
-    var daBarcode = !!(barcodeValue && barcodeValue.replace(/\D/g,'').length >= 4);
-    var trovatoNum = daBarcode ? barcodeValue.replace(/\s+/g,'') : (riconosciNumero(risultato.numero) || riconosciNumero(risultato.nome));
-    if(trovatoNum){
-      document.getElementById('fNumero').value = trovatoNum;
-      numeroAutoRilevato = true;
-      msgs.push(daBarcode ? 'numero tessera (letto dal codice a barre — alta affidabilità)' : 'numero tessera');
-    }
-  }
-  return msgs;
-}
 function mostraEsitoHint(msgs, forzato){
   var hint = document.getElementById('ocrHint');
   if(msgs.length){
@@ -787,10 +754,33 @@ function mostraCaricamentoOCR(attivo){
   var banner = document.getElementById('ocrBanner');
   if(banner) banner.classList.toggle('show', !!attivo);
 }
-// ── Scansione unificata: analizza SEMPRE fronte + retro insieme in un'unica passata.
-// Evita il bug delle due scansioni "in corsa" (una per foto) che potevano sovrascriversi
-// a vicenda a seconda di quale finiva per ultima. Ogni chiamata riceve un id progressivo:
-// se nel frattempo ne parte una più recente, il risultato di quella vecchia viene scartato.
+function aggiornaTestoBanner(testo, sotto){
+  var t = document.querySelector('#ocrBanner .ocr-banner-txt');
+  var s = document.querySelector('#ocrBanner .ocr-banner-sub');
+  if(t) t.textContent = testo;
+  if(s) s.textContent = sotto || '';
+}
+// Cerca il nome del negozio, riprovando automaticamente fino a "max" volte se non trova
+// nulla al primo colpo — invece di far ricliccare l'utente più volte a mano. Ogni tentativo
+// mostra il proprio avanzamento nel banner. Si ferma subito appena trova un negozio noto.
+function trovaNomeConRitentativi(immagini, myId, tentativo, max){
+  if(myId !== _ocrRequestId) return Promise.resolve(null);
+  aggiornaTestoBanner(
+    '🔎 Ricerca nome negozio (tentativo ' + tentativo + ' di ' + max + ')…',
+    'Il numero, se leggibile dal codice a barre, arriva più veloce'
+  );
+  return Promise.all(immagini.map(function(img){ return estraiTestoNome(img); })).then(function(testi){
+    if(myId !== _ocrRequestId) return null;
+    var trovato = riconosciNegozio(testi.join('\n'));
+    if(trovato || tentativo >= max) return trovato;
+    return trovaNomeConRitentativi(immagini, myId, tentativo + 1, max);
+  });
+}
+// ── Scansione unificata: analizza SEMPRE fronte + retro insieme.
+// Barcode (veloce) e nome (con ritentativi automatici) partono in parallelo; l'OCR delle
+// cifre viene interpellato SOLO come riserva, se il barcode non trova nulla.
+// Ogni chiamata riceve un id progressivo: se nel frattempo ne parte una più recente,
+// il risultato di quella vecchia viene scartato (evita che due scansioni si sovrascrivano).
 var _ocrRequestId = 0;
 function eseguiScansione(forza){
   if(!pendingFronte && !pendingRetro){
@@ -806,29 +796,50 @@ function eseguiScansione(forza){
 
   var myId = ++_ocrRequestId;
   mostraCaricamentoOCR(true);
-  var bannerTxt = document.querySelector('#ocrBanner .ocr-banner-txt');
-  var bannerSub = document.querySelector('#ocrBanner .ocr-banner-sub');
-  if(bannerTxt) bannerTxt.textContent = '🔎 Rilevamento nome e numero in corso…';
-  if(bannerSub) bannerSub.textContent = 'La prima volta può richiedere qualche secondo in più';
+  aggiornaTestoBanner('🔎 Rilevamento in corso…', 'La prima volta può richiedere qualche secondo in più');
   document.getElementById('ocrHint').style.display = 'none';
 
-  var immaginiOCR = [];
-  if(pendingFronte) immaginiOCR.push(pendingFronteOCR || pendingFronte);
-  if(pendingRetro) immaginiOCR.push(pendingRetroOCR || pendingRetro);
+  var immagini = [];
+  if(pendingFronte) immagini.push(pendingFronteOCR || pendingFronte);
+  if(pendingRetro) immagini.push(pendingRetroOCR || pendingRetro);
 
-  var promesseTesto = immaginiOCR.map(function(img){ return estraiTesto(img); });
-  var promesseBarcode = immaginiOCR.map(function(img){ return decodificaBarcode(img); });
+  var pBarcode = serveNumero
+    ? Promise.all(immagini.map(function(img){ return decodificaBarcode(img); })).then(function(r){ return r.filter(Boolean)[0] || null; })
+    : Promise.resolve(null);
+  var pNome = serveNome ? trovaNomeConRitentativi(immagini, myId, 1, 3) : Promise.resolve(null);
 
-  Promise.all([Promise.all(promesseTesto), Promise.all(promesseBarcode)]).then(function(risultati){
-    if(myId !== _ocrRequestId) return; // superata da una scansione più recente: ignora
-    mostraCaricamentoOCR(false);
-    var testi = risultati[0];
-    var barcodeTrovato = risultati[1].filter(Boolean)[0] || null;
-    var combinato = {
-      nome: testi.map(function(r){ return r.nome; }).join('\n'),
-      numero: testi.map(function(r){ return r.numero; }).join('\n')
-    };
-    mostraEsitoHint(applicaRisultatoOCR(combinato, forza, barcodeTrovato), forza);
+  Promise.all([pBarcode, pNome]).then(function(risultati){
+    if(myId !== _ocrRequestId) return;
+    var barcodeVal = risultati[0];
+    var nomeTrovato = risultati[1];
+    // L'OCR sulle cifre serve solo se il numero è richiesto E il barcode non l'ha trovato
+    var necessitaNumeroOCR = serveNumero && !barcodeVal;
+    var pNumeroOCR = necessitaNumeroOCR
+      ? (aggiornaTestoBanner('🔎 Lettura cifre di riserva in corso…', 'Il codice a barre non è stato letto direttamente'),
+         Promise.all(immagini.map(function(img){ return estraiTestoNumero(img); })).then(function(testi){ return riconosciNumero(testi.join('\n')); }))
+      : Promise.resolve(null);
+
+    pNumeroOCR.then(function(numeroOCR){
+      if(myId !== _ocrRequestId) return;
+      mostraCaricamentoOCR(false);
+      var msgs = [];
+      if(serveNome && nomeTrovato){
+        document.getElementById('fNome').value = nomeTrovato.n;
+        nomeAutoRilevato = true;
+        selectColor(nomeTrovato.c);
+        msgs.push('negozio "' + nomeTrovato.n + '"');
+      }
+      if(serveNumero){
+        var daBarcode = !!barcodeVal;
+        var numeroFinale = daBarcode ? barcodeVal.replace(/\s+/g, '') : numeroOCR;
+        if(numeroFinale){
+          document.getElementById('fNumero').value = numeroFinale;
+          numeroAutoRilevato = true;
+          msgs.push(daBarcode ? 'numero tessera (letto dal codice a barre — alta affidabilità)' : 'numero tessera');
+        }
+      }
+      mostraEsitoHint(msgs, forza);
+    });
   }).catch(function(err){
     if(myId !== _ocrRequestId) return;
     console.error('OCR error:', err);
@@ -847,10 +858,7 @@ function rilevaSoloBarcode(){
   if(!pendingFronte && !pendingRetro){ toast('⚠ Carica prima almeno una foto'); return; }
   var myId = ++_ocrRequestId;
   mostraCaricamentoOCR(true);
-  var banner = document.querySelector('#ocrBanner .ocr-banner-txt');
-  var bannerSub = document.querySelector('#ocrBanner .ocr-banner-sub');
-  if(banner) banner.textContent = '📷 Ricerca del codice a barre in corso…';
-  if(bannerSub) bannerSub.textContent = 'Lettura diretta delle barre, non del testo stampato';
+  aggiornaTestoBanner('📷 Ricerca del codice a barre in corso…', 'Lettura diretta delle barre, non del testo stampato');
   var hint = document.getElementById('ocrHint');
   hint.style.display = 'none';
 
@@ -861,8 +869,7 @@ function rilevaSoloBarcode(){
   Promise.all(immagini.map(function(img){ return decodificaBarcode(img); })).then(function(risultati){
     if(myId !== _ocrRequestId) return;
     mostraCaricamentoOCR(false);
-    if(banner) banner.textContent = '🔎 Rilevamento nome e numero in corso…';
-    if(bannerSub) bannerSub.textContent = 'La prima volta può richiedere qualche secondo in più';
+    aggiornaTestoBanner('🔎 Rilevamento in corso…', 'La prima volta può richiedere qualche secondo in più');
     var trovato = risultati.filter(Boolean)[0] || null;
     hint.style.display = 'flex';
     if(trovato){
@@ -1154,6 +1161,7 @@ function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').repla
 
 // ── ABOUT / CRONOLOGIA ──
 var CHANGELOG = [
+  { v:'v14', data:'2026-08-10', voci:['Ora si può caricare la foto anche dalla galleria/file già esistenti, non solo scattandola sul momento: il pulsante "Carica foto" apre la scelta tra fotocamera e file.','Il riconoscimento del nome negozio riprova automaticamente fino a 3 volte se non trova nulla al primo tentativo, senza dover ricliccare a mano.','Messaggi del banner ora specifici per ogni fase (ricerca barcode, ricerca nome con numero del tentativo, lettura cifre di riserva) invece del solo testo generico.','L\'OCR sulle cifre parte solo se il codice a barre non viene letto direttamente, risparmiando tempo quando il barcode funziona.'] },
   { v:'v13', data:'2026-08-10', voci:['Nuovo tasto dedicato "Rileva codice a barre": esegue SOLO la lettura diretta del barcode (veloce, senza il peso dell\'OCR completo) con un messaggio specifico sul suo esito.','Il tasto "Rileva anche nome e numero" resta per la scansione completa (barcode + OCR di riserva + nome negozio).','Messaggi del banner più specifici a seconda di quale rilevamento è in corso.'] },
   { v:'v12', data:'2026-08-10', voci:['Novità importante: l\'app ora prova prima a leggere il codice a barre DIRETTAMENTE (come uno scanner alla cassa), invece di leggere solo le cifre stampate accanto. Molto più affidabile quando funziona: usa prima l\'API nativa del browser, poi una libreria di riserva se il telefono non la supporta. Il numero letto in questo modo viene segnalato come "alta affidabilità".','Se il codice a barre non si riesce a decodificare, l\'app torna comunque al riconoscimento delle cifre stampate come prima.'] },
   { v:'v11', data:'2026-08-10', voci:['Corretto il link della libreria che disegna il codice a barre: puntava a un percorso con maiuscole sbagliate, quindi il barcode non veniva mai generato (bug identico a quello già corretto per il riconoscimento testo).','Rimosso un tentativo di correzione automatica del numero che si è rivelato inaffidabile: in alcuni casi "sistemava" la prima cifra mancante, in altri corrompeva un numero già corretto. Ora l\'app mostra sempre il blocco di cifre più lungo trovato, senza tentativi rischiosi di unione — se manca una cifra va aggiunta a mano.','Aggiunto un avviso permanente sotto il campo numero: verificare sempre il dato con la tessera fisica prima di salvare.','Eventuali errori nella generazione del barcode ora vengono mostrati chiaramente invece di sparire in silenzio.'] },
