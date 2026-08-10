@@ -293,28 +293,68 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#eceff1;color:#1a1a1
 <div id="toast"></div>
 
 <script>
-var APP_VERSION = 'v6';
+var APP_VERSION = 'v7';
 var DB_KEY = 'tf_db_v1';
 var MESI = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
 
 // ── PALETTE ──
 var PALETTE = ['#e53935','#8e24aa','#3949ab','#1e88e5','#00897b','#43a047','#fb8c00','#6d4c41','#546e7a','#d81b60','#00acc1','#c0ca33'];
 
-// ── CATENE NOTE (nome → colore [+ alias per il riconoscimento OCR]) ──
-var STORE_LIST = [
-  {n:'Esselunga', c:'#e2001a'}, {n:'Coop', c:'#c8102e'}, {n:'Conad', c:'#0033a0'},
-  {n:'Carrefour', c:'#00549f'}, {n:'Lidl', c:'#0050aa'}, {n:'Eurospin', c:'#f39200'},
-  {n:'Pam', c:'#e4032e'}, {n:'Despar', c:'#00953b'}, {n:'Iper', c:'#ff6600'},
-  {n:'Auchan', c:'#e2001a'}, {n:'MD', c:'#0066b3'}, {n:'Todis', c:'#f7a600'},
-  {n:'Famila', c:'#004b93'}, {n:'Crai', c:'#00a651'}, {n:'Bennet', c:'#004b8d'},
-  {n:'Tigros', c:'#005baa'}, {n:"In's", c:'#e30613'}, {n:'Simply', c:'#8dc63f'},
-  {n:'Basko', c:'#0066b3'}, {n:'Ipercoop', c:'#c8102e'},
-  {n:'Penny', c:'#ed1c24', alias:['Penny Market','Pennycard','Penny Card']},
-  {n:'Sisa', c:'#e30613'}, {n:'Sigma', c:'#0066b3'}, {n:'Unieuro', c:'#1a2b4a'},
-  {n:'Tigotà', c:'#00a0a0'}, {n:'Il Gigante', c:'#c8102e'}, {n:'Viridea', c:'#1f6b2e'},
-  {n:'BeautyStar', c:'#111111'}, {n:'OBI', c:'#f36c21'}, {n:'Action', c:'#0055a4'},
-  {n:'KIK', c:'#e2001a'}, {n:'Decathlon', c:'#0082c3'}
+// ── CATENE NOTE — stessa logica "a parola-chiave" della versione desktop:
+// basta che il testo OCR contenga la parola, senza bisogno di corrispondenza esatta ──
+var STORE_HINTS = [
+  {hint:'esselunga', n:'Esselunga', c:'#e2001a'},
+  {hint:'conad', n:'Conad', c:'#0033a0'},
+  {hint:'coop', n:'Coop', c:'#c8102e'},
+  {hint:'carrefour', n:'Carrefour', c:'#00549f'},
+  {hint:'lidl', n:'Lidl', c:'#0050aa'},
+  {hint:'eurospin', n:'Eurospin', c:'#f39200'},
+  {hint:'pam', n:'Pam', c:'#e4032e'},
+  {hint:'despar', n:'Despar', c:'#00953b'},
+  {hint:'iper', n:'Iper', c:'#ff6600'},
+  {hint:'auchan', n:'Auchan', c:'#e2001a'},
+  {hint:'todis', n:'Todis', c:'#f7a600'},
+  {hint:'famila', n:'Famila', c:'#004b93'},
+  {hint:'crai', n:'Crai', c:'#00a651'},
+  {hint:'bennet', n:'Bennet', c:'#004b8d'},
+  {hint:'tigros', n:'Tigros', c:'#005baa'},
+  {hint:"in's", n:"In's", c:'#e30613'},
+  {hint:'simply', n:'Simply', c:'#8dc63f'},
+  {hint:'basko', n:'Basko', c:'#0066b3'},
+  {hint:'ipercoop', n:'Ipercoop', c:'#c8102e'},
+  {hint:'penny', n:'Penny', c:'#ed1c24'},
+  {hint:'sisa', n:'Sisa', c:'#e30613'},
+  {hint:'sigma', n:'Sigma', c:'#0066b3'},
+  {hint:'unieuro', n:'Unieuro', c:'#1a2b4a'},
+  {hint:'tigotà', n:'Tigotà', c:'#00a0a0'},
+  {hint:'tigota', n:'Tigotà', c:'#00a0a0'},
+  {hint:'il gigante', n:'Il Gigante', c:'#c8102e'},
+  {hint:'viridea', n:'Viridea', c:'#1f6b2e'},
+  {hint:'beautystar', n:'BeautyStar', c:'#111111'},
+  {hint:'obi', n:'OBI', c:'#f36c21'},
+  {hint:'action', n:'Action', c:'#0055a4'},
+  {hint:'kik', n:'KIK', c:'#e2001a'},
+  {hint:'decathlon', n:'Decathlon', c:'#0082c3'},
+  {hint:'amazon', n:'Amazon', c:'#ff9900'},
+  {hint:'ikea', n:'Ikea', c:'#0058a3'},
+  {hint:'leroy merlin', n:'Leroy Merlin', c:'#78be20'},
+  {hint:'bricoman', n:'Bricoman', c:'#e2001a'},
+  {hint:'mediaworld', n:'Mediaworld', c:'#e2001a'},
+  {hint:'mediamarket', n:'Mediaworld', c:'#e2001a'},
+  {hint:'trony', n:'Trony', c:'#0055a4'},
+  {hint:'euronics', n:'Euronics', c:'#004b93'},
+  {hint:'acqua e sapone', n:'Acqua e Sapone', c:'#00a0a0'},
+  {hint:'aldi', n:'Aldi', c:'#00447c'},
+  {hint:'happy casa', n:'Happy Casa', c:'#e2001a'},
+  {hint:'center casa', n:'Center Casa', c:'#0066b3'},
+  {hint:'carpisa', n:'Carpisa', c:'#111111'}
 ];
+// Lista deduplicata (per suggerimenti nel campo e colore quando il nome è scritto a mano)
+var STORE_LIST = (function(){
+  var visti = {}, out = [];
+  STORE_HINTS.forEach(function(s){ if(!visti[s.n]){ visti[s.n]=1; out.push({n:s.n, c:s.c}); } });
+  return out;
+})();
 
 function findPreset(nome){
   var k = (nome||'').trim().toLowerCase();
@@ -338,41 +378,38 @@ function inizialiFrom(nome){
   if(parts.length===1) return parts[0].substring(0,2).toUpperCase();
   return (parts[0][0]+parts[1][0]).toUpperCase();
 }
-// Cerca un nome negozio noto dentro un testo OCR grezzo (confronta nome, alias e parola principale)
-function pulisci(s){ return (s||'').toUpperCase().replace(/[^A-Z0-9]/g,''); }
-function parolaChiave(nome){
-  var parole = (nome||'').split(/\s+/).filter(Boolean);
-  var migliore = parole[0] || nome;
-  parole.forEach(function(p){ if(pulisci(p).length >= 4 && pulisci(p).length > pulisci(migliore).length) migliore = p; });
-  return migliore;
-}
+// Cerca un negozio noto: basta che una delle parole-chiave compaia nel testo OCR
+// (stesso principio della versione desktop: semplice "contiene", niente match esatti)
 function riconosciNegozio(testo){
   if(!testo) return null;
-  var upClean = pulisci(testo);
+  var low = testo.toLowerCase();
   var best = null, bestLen = 0;
-  STORE_LIST.forEach(function(s){
-    var candidati = [s.n].concat(s.alias || []);
-    candidati.push(parolaChiave(s.n));
-    candidati.forEach(function(cand){
-      var pat = pulisci(cand);
-      if(pat.length < 3) return; // evita match troppo corti/rumorosi (es. "MD")
-      if(upClean.indexOf(pat) !== -1 && pat.length > bestLen){
-        best = s; bestLen = pat.length;
-      }
-    });
+  STORE_HINTS.forEach(function(s){
+    if(low.indexOf(s.hint) !== -1 && s.hint.length > bestLen){
+      best = s; bestLen = s.hint.length;
+    }
   });
-  return best;
+  return best ? {n:best.n, c:best.c} : null;
 }
-// Cerca la sequenza numerica più lunga nel testo OCR (probabile numero tessera / codice a barre)
+// Corregge le confusioni tipiche dell'OCR quando ci si aspettano solo cifre (O→0, I/l→1)
+function correggiCifreOCR(s){
+  return (s||'').replace(/[Oo]/g,'0').replace(/[Il]/g,'1');
+}
+// Cerca il numero riga per riga (NON attraverso più righe insieme, altrimenti si rischia
+// di unire cifre sparse in punti diversi della foto in un unico numero senza senso).
+// Verificato su foto reali di codici a barre circondati da sfondi complessi.
 function riconosciNumero(testo){
   if(!testo) return null;
-  var matches = testo.match(/\d[\d\s]{5,}\d/g) || [];
+  var righe = (testo || '').split(/\r?\n/);
   var best = '';
-  matches.forEach(function(m){
-    var clean = m.replace(/\s+/g,'');
-    if(clean.length > best.length) best = clean;
+  righe.forEach(function(riga){
+    var t = riga.trim();
+    if(!t) return;
+    if(!/^[0-9OoIl][0-9OoIl \t]*[0-9OoIl]$/.test(t) && !/^[0-9OoIl]$/.test(t)) return;
+    var clean = correggiCifreOCR(t).replace(/[\s\t]+/g,'');
+    if(clean.length >= 6 && clean.length > best.length) best = clean;
   });
-  return best.length >= 6 ? best : null;
+  return best || null;
 }
 function formattaNumero(n){
   return (n||'').replace(/(.{4})/g,'$1 ').trim();
@@ -438,6 +475,8 @@ function aggiornaHome() {
 var selectedColor = null;
 var pendingFronte = null;
 var pendingRetro = null;
+var pendingFronteOCR = null; // versione ad alta risoluzione, solo per il riconoscimento testo
+var pendingRetroOCR = null;
 var nomeAutoRilevato = false;
 var numeroAutoRilevato = false;
 
@@ -502,14 +541,20 @@ function renderFotoSlot(slot){
 function onFotoChange(ev, slot){
   var file = ev.target.files[0];
   if(!file) return;
+  // Copia per il salvataggio: più leggera, per non appesantire l'archivio
   compressImage(file, 1100, 0.82, function(dataUrl){
     if(slot==='fronte'){ pendingFronte = dataUrl; } else { pendingRetro = dataUrl; }
     renderFotoSlot(slot);
-    avviaRiconoscimentoOCR(dataUrl);
+  });
+  // Copia separata ad alta risoluzione, usata SOLO per il riconoscimento testo:
+  // i dettagli piccoli (numeri, codice a barre) si leggono molto meglio a piena definizione.
+  compressImage(file, 2000, 0.94, function(dataUrlHQ){
+    if(slot==='fronte'){ pendingFronteOCR = dataUrlHQ; } else { pendingRetroOCR = dataUrlHQ; }
+    avviaRiconoscimentoOCR(dataUrlHQ);
   });
 }
 function rimuoviFoto(slot){
-  if(slot==='fronte'){ pendingFronte = null; } else { pendingRetro = null; }
+  if(slot==='fronte'){ pendingFronte = null; pendingFronteOCR = null; } else { pendingRetro = null; pendingRetroOCR = null; }
   renderFotoSlot(slot);
 }
 function aggiornaVisibilitaRetry(){
@@ -549,23 +594,91 @@ function caricaTesseract(){
   });
   return _tesseractLoading;
 }
+// Pre-elabora l'immagine PRIMA dell'OCR (stesso principio della versione desktop):
+// scala di grigi, ingrandimento se piccola, aumento del contrasto e nitidezza.
+// Questo passaggio conta più della risoluzione grezza per leggere bene numeri piccoli.
+function preelaboraPerOCR(dataUrl, cb){
+  var img = new Image();
+  img.onload = function(){
+    var minW = 1400;
+    var w = img.width, h = img.height;
+    if(w < minW){ h = Math.round(h * (minW / w)); w = minW; }
+    var canvas = document.createElement('canvas');
+    canvas.width = w; canvas.height = h;
+    var ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0, w, h);
+    var imgData = ctx.getImageData(0, 0, w, h);
+    var d = imgData.data;
+    // 1) Scala di grigi + calcolo min/max per il contrasto
+    var min = 255, max = 0;
+    for(var i=0; i<d.length; i+=4){
+      var gray = 0.299*d[i] + 0.587*d[i+1] + 0.114*d[i+2];
+      d[i] = d[i+1] = d[i+2] = gray;
+      if(gray < min) min = gray;
+      if(gray > max) max = gray;
+    }
+    // 2) Stiramento del contrasto (autocontrast)
+    var range = Math.max(1, max - min);
+    for(var j=0; j<d.length; j+=4){
+      var v = (d[j] - min) * (255 / range);
+      v = v < 0 ? 0 : (v > 255 ? 255 : v);
+      d[j] = d[j+1] = d[j+2] = v;
+    }
+    ctx.putImageData(imgData, 0, 0);
+    // 3) Leggero aumento di nitidezza sui bordi (unsharp mask semplificata)
+    ctx.filter = 'none';
+    var out = document.createElement('canvas');
+    out.width = w; out.height = h;
+    var octx = out.getContext('2d');
+    octx.filter = 'contrast(112%) brightness(102%)';
+    octx.drawImage(canvas, 0, 0);
+    cb(out.toDataURL('image/jpeg', 0.95));
+  };
+  img.onerror = function(){ cb(dataUrl); }; // in caso di problemi, tenta comunque con l'originale
+  img.src = dataUrl;
+}
 function estraiTesto(dataUrl){
-  return caricaTesseract().then(function(){
-    return Tesseract.recognize(dataUrl, 'ita+eng');
-  }).then(function(result){
-    return (result && result.data && result.data.text) || '';
+  // Due passate separate sulla stessa immagine pre-elaborata:
+  // 1) blocco di testo (psm 6) → buona per il nome del negozio
+  // 2) testo sparso + sole cifre (psm 11) → indispensabile per leggere il numero/codice
+  //    a barre quando è circondato da sfondi complessi (verificato su foto reali)
+  return new Promise(function(resolve, reject){
+    preelaboraPerOCR(dataUrl, function(dataUrlPulito){
+      var worker;
+      caricaTesseract().then(function(){
+        return Tesseract.createWorker('ita+eng');
+      }).then(function(w){
+        worker = w;
+        return worker.setParameters({ tessedit_pageseg_mode: '6' });
+      }).then(function(){
+        return worker.recognize(dataUrlPulito);
+      }).then(function(risNome){
+        var testoNome = (risNome && risNome.data && risNome.data.text) || '';
+        return worker.setParameters({ tessedit_pageseg_mode: '11', tessedit_char_whitelist: '0123456789' })
+          .then(function(){ return worker.recognize(dataUrlPulito); })
+          .then(function(risNum){
+            var testoNumero = (risNum && risNum.data && risNum.data.text) || '';
+            worker.terminate();
+            resolve({ nome: testoNome, numero: testoNumero });
+          });
+      }).catch(function(err){
+        if(worker) worker.terminate();
+        reject(err);
+      });
+    });
   });
 }
-// Applica i risultati OCR ai campi. Con forza=true (tasto "Riprova") riempie
-// qualunque campo vuoto; altrimenti rispetta i campi già scritti/rilevati a mano.
-function applicaRisultatoOCR(testo, forza){
+// Applica i risultati OCR ai campi. "risultato" è {nome, numero} (testi delle due passate).
+// Con forza=true (tasto "Riprova") riempie qualunque campo vuoto; altrimenti rispetta
+// i campi già scritti/rilevati a mano.
+function applicaRisultatoOCR(risultato, forza){
   var nomeAttuale = document.getElementById('fNome').value.trim();
   var numeroAttuale = document.getElementById('fNumero').value.trim();
   var serveNome = forza ? !nomeAttuale : (!nomeAttuale || nomeAutoRilevato);
   var serveNumero = forza ? !numeroAttuale : (!numeroAttuale || numeroAutoRilevato);
   var msgs = [];
   if(serveNome){
-    var trovatoNome = riconosciNegozio(testo);
+    var trovatoNome = riconosciNegozio(risultato.nome);
     if(trovatoNome){
       document.getElementById('fNome').value = trovatoNome.n;
       nomeAutoRilevato = true;
@@ -574,7 +687,7 @@ function applicaRisultatoOCR(testo, forza){
     }
   }
   if(serveNumero){
-    var trovatoNum = riconosciNumero(testo);
+    var trovatoNum = riconosciNumero(risultato.numero) || riconosciNumero(risultato.nome);
     if(trovatoNum){
       document.getElementById('fNumero').value = trovatoNum;
       numeroAutoRilevato = true;
@@ -626,10 +739,14 @@ function riprovaOCR(){
   hint.className = 'hint';
   hint.textContent = '🔎 Rilevamento in corso su fronte e retro...';
   var promesse = [];
-  if(pendingFronte) promesse.push(estraiTesto(pendingFronte));
-  if(pendingRetro) promesse.push(estraiTesto(pendingRetro));
-  Promise.all(promesse).then(function(testi){
-    mostraEsitoHint(applicaRisultatoOCR(testi.join('\n'), true), true);
+  if(pendingFronte) promesse.push(estraiTesto(pendingFronteOCR || pendingFronte));
+  if(pendingRetro) promesse.push(estraiTesto(pendingRetroOCR || pendingRetro));
+  Promise.all(promesse).then(function(risultati){
+    var combinato = {
+      nome: risultati.map(function(r){ return r.nome; }).join('\n'),
+      numero: risultati.map(function(r){ return r.numero; }).join('\n')
+    };
+    mostraEsitoHint(applicaRisultatoOCR(combinato, true), true);
   }).catch(function(err){
     console.error('OCR error:', err);
     hint.style.display = 'flex';
@@ -890,6 +1007,7 @@ function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').repla
 
 // ── ABOUT / CRONOLOGIA ──
 var CHANGELOG = [
+  { v:'v7', data:'2026-08-10', voci:['Riconoscimento molto più robusto: pre-elaborazione dell\'immagine (scala di grigi, contrasto, nitidezza) prima dell\'OCR, come nella versione desktop.','Doppia passata OCR: una per il nome negozio, una dedicata solo alle cifre in modalità "testo sparso" — indispensabile per leggere codici a barre su sfondi complessi.','Elenco negozi a "parola-chiave" invece di corrispondenza esatta: basta che il nome compaia nel testo, anche abbreviato.','Corretto un bug che univa cifre di punti diversi della foto in un numero senza senso; ora la ricerca resta riga per riga.'] },
   { v:'v6', data:'2026-08-10', voci:['Corretto un bug: il link della libreria di riconoscimento testo puntava a un indirizzo inesistente, quindi il riconoscimento automatico non funzionava mai.','Ora un eventuale errore di riconoscimento viene mostrato chiaramente invece di fallire in silenzio.'] },
   { v:'v5', data:'2026-08-10', voci:['Riconoscimento del negozio più tollerante (riconosce anche nomi commerciali brevi, es. "Penny" invece di "Penny Market").','Nuovo tasto "Riprova a rilevare" nella schermata Inserisci: rianalizza le foto già caricate senza doverle ricaricare.'] },
   { v:'v4', data:'2026-08-10', voci:['Corretto il riconoscimento automatico: ora l\'app analizza sia la foto del fronte sia quella del retro, così trova nome e numero anche quando il codice a barre è sul retro.'] },
