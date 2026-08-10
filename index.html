@@ -107,8 +107,9 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#eceff1;color:#1a1a1
 
 /* DIGITAL CARD — la schermata "da mostrare alla cassa" */
 .digicard{border-radius:18px;overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,0.18);margin-bottom:18px;}
-.digicard-top{padding:20px 20px 16px;color:#fff;text-align:center;}
-.digicard-name{font-size:20px;font-weight:800;text-shadow:0 1px 2px rgba(0,0,0,0.2);}
+.digicard-top{padding:16px 18px;color:#fff;display:flex;align-items:center;gap:12px;}
+.digicard-badge{width:46px;height:46px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:16px;flex-shrink:0;box-shadow:0 1px 4px rgba(0,0,0,0.25);}
+.digicard-name{font-size:19px;font-weight:800;text-shadow:0 1px 2px rgba(0,0,0,0.2);text-align:left;flex:1;}
 .digicard-body{background:#fff;padding:20px 14px 24px;text-align:center;}
 .digicard-barcode{width:100%;overflow:hidden;}
 .digicard-barcode svg{width:100%;height:auto;max-height:88px;}
@@ -226,6 +227,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#eceff1;color:#1a1a1
 <div class="scr" id="scrDettaglio">
   <div class="digicard" id="digicard">
     <div class="digicard-top" id="digicardTop">
+      <div class="digicard-badge" id="digicardBadge"></div>
       <div class="digicard-name" id="detNome"></div>
     </div>
     <div class="digicard-body">
@@ -293,7 +295,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#eceff1;color:#1a1a1
 <div id="toast"></div>
 
 <script>
-var APP_VERSION = 'v8';
+var APP_VERSION = 'v9';
 var DB_KEY = 'tf_db_v1';
 var MESI = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
 
@@ -867,6 +869,9 @@ function apriDettaglio(id){
   if(!t){ toast('⚠ Tessera non trovata'); goHome(); return; }
   var col = t.colore || coloreFor(t.nome);
   document.getElementById('digicardTop').style.background = col;
+  var badge = document.getElementById('digicardBadge');
+  badge.textContent = inizialiFrom(t.nome);
+  badge.style.color = col;
   document.getElementById('detNome').textContent = t.nome;
   document.getElementById('detNote').textContent = t.note || '';
   document.getElementById('detNote').style.display = t.note ? 'block' : 'none';
@@ -1016,6 +1021,7 @@ function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').repla
 
 // ── ABOUT / CRONOLOGIA ──
 var CHANGELOG = [
+  { v:'v9', data:'2026-08-10', voci:['Intestazione della card "da mostrare alla cassa" ridisegnata: cerchietto con le iniziali del negozio accanto al nome, in stile app di pagamento/wallet.'] },
   { v:'v8', data:'2026-08-10', voci:['Corretto: nei codici a barre EAN-13 la prima cifra viene spesso stampata staccata dal resto del numero (è normale, non un errore di stampa) — ora viene riconosciuta e riattaccata automaticamente, invece di andare persa.'] },
   { v:'v7', data:'2026-08-10', voci:['Riconoscimento molto più robusto: pre-elaborazione dell\'immagine (scala di grigi, contrasto, nitidezza) prima dell\'OCR, come nella versione desktop.','Doppia passata OCR: una per il nome negozio, una dedicata solo alle cifre in modalità "testo sparso" — indispensabile per leggere codici a barre su sfondi complessi.','Elenco negozi a "parola-chiave" invece di corrispondenza esatta: basta che il nome compaia nel testo, anche abbreviato.','Corretto un bug che univa cifre di punti diversi della foto in un numero senza senso; ora la ricerca resta riga per riga.'] },
   { v:'v6', data:'2026-08-10', voci:['Corretto un bug: il link della libreria di riconoscimento testo puntava a un indirizzo inesistente, quindi il riconoscimento automatico non funzionava mai.','Ora un eventuale errore di riconoscimento viene mostrato chiaramente invece di fallire in silenzio.'] },
