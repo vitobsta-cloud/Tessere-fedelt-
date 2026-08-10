@@ -112,9 +112,6 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#eceff1;color:#1a1a1
 .swatch-row{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:4px;}
 .swatch{width:34px;height:34px;border-radius:50%;cursor:pointer;border:2px solid transparent;display:flex;align-items:center;justify-content:center;font-size:15px;color:#fff;transition:border-color .15s,transform .1s;}
 .swatch.sel{border-color:#1a1a18;transform:scale(1.12);}
-.icon-row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:4px;}
-.icon-chip{width:38px;height:38px;border-radius:10px;background:#f5f4f0;border:1.5px solid #e2e0d8;display:flex;align-items:center;justify-content:center;font-size:19px;cursor:pointer;transition:border-color .15s,transform .1s;}
-.icon-chip.sel{border-color:#1a1a18;background:#fff;transform:scale(1.1);box-shadow:0 1px 4px rgba(0,0,0,.15);}
 
 /* PHOTO CAPTURE */
 .foto-wrap{border:1.5px dashed #d3d1c7;border-radius:12px;padding:16px;text-align:center;cursor:pointer;transition:border-color .15s;background:#fafaf9;}
@@ -238,7 +235,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#eceff1;color:#1a1a1
 
       <div class="fg" style="margin-top:6px">
         <label>Icona tessera</label>
-        <div class="icon-row" id="iconRow"></div>
+        <select id="iconSelect" onchange="selectIcona(this.value)"></select>
       </div>
 
       <div class="fg" style="margin-top:6px">
@@ -344,7 +341,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#eceff1;color:#1a1a1
 <div id="toast"></div>
 
 <script>
-var APP_VERSION = 'v23';
+var APP_VERSION = 'v24';
 var DB_KEY = 'tf_db_v1';
 var MESI = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
 
@@ -647,23 +644,19 @@ function selectColor(c){ selectedColor = c; refreshSwatches(); }
 
 var selectedIcona = null;
 function buildIconRow(){
-  var row = document.getElementById('iconRow');
-  row.innerHTML = '';
+  var sel = document.getElementById('iconSelect');
+  sel.innerHTML = '';
   ICONS_PICKER.forEach(function(o){
-    var el = document.createElement('div');
-    el.className = 'icon-chip';
-    el.textContent = o.ic;
-    el.title = o.label;
-    el.dataset.ic = o.ic;
-    el.onclick = function(){ selectedIcona = o.ic; refreshIconRow(); };
-    row.appendChild(el);
+    var opt = document.createElement('option');
+    opt.value = o.ic;
+    opt.textContent = o.ic + '  ' + o.label;
+    sel.appendChild(opt);
   });
   refreshIconRow();
 }
 function refreshIconRow(){
-  document.querySelectorAll('#iconRow .icon-chip').forEach(function(el){
-    el.classList.toggle('sel', el.dataset.ic === selectedIcona);
-  });
+  var sel = document.getElementById('iconSelect');
+  if(sel) sel.value = selectedIcona;
 }
 function selectIcona(ic){ selectedIcona = ic; refreshIconRow(); }
 
@@ -1372,6 +1365,7 @@ function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').repla
 
 // ── ABOUT / CRONOLOGIA ──
 var CHANGELOG = [
+  { v:'v24', data:'2026-08-10', voci:['La scelta dell\'icona tessera non è più una griglia di riquadri: ora è un menù a tendina (elenco a scorrimento) dove l\'icona proposta di default resta quella rilevata automaticamente dal nome negozio, e si può cambiare scorrendo tutte le icone disponibili, con meno spazio occupato nel form.'] },
   { v:'v23', data:'2026-08-10', voci:['Corretto: l\'apertura ora è VERAMENTE offline-first — nella v22 la cache veniva mostrata subito ma il tentativo di rete partiva comunque nello stesso istante, in parallelo. Ora il primo tentativo di rete (sia per il controllo aggiornamenti dell\'app, sia per il banner di stato connessione) parte solo 2,5 secondi DOPO l\'apertura, mai insieme: prima si vede sempre e solo la versione offline già in cache.'] },
   { v:'v22', data:'2026-08-10', voci:['Cambiata la strategia del service worker: la pagina principale ora viene sempre servita PRIMA dalla cache (se presente), invece di aspettare la rete anche solo per una frazione di secondo — apertura istantanea in ogni condizione, fondamentale alla cassa. In parallelo, in background, l\'app scarica comunque la versione più recente per farla trovare pronta alla prossima apertura. Solo la primissima apertura in assoluto (prima ancora che ci sia qualcosa in cache) richiede la rete.'] },
   { v:'v21', data:'2026-08-10', voci:['Nuova icona per categoria merceologica, scelta automaticamente in base al negozio (es. 🛒 supermercato, 🧰 bricolage, 📺 elettronica, 💄 profumeria...) e visibile sia nella griglia "Le mie tessere" sia nel dettaglio tessera — modificabile a mano in qualsiasi momento, anche in modifica, tra oltre 30 icone disponibili. Non sono loghi ufficiali scaricati (questioni di copyright), ma aiutano comunque a distinguere le tessere a colpo d\'occhio.','Nella griglia "Le mie tessere" la nota torna visibile come sottotitolo sotto il nome, insieme alla nuova icona.','L\'app ora si avvia SEMPRE, anche offline o con poco campo (tipico nei supermercati): il service worker aspetta la rete al massimo 2,5 secondi, poi mostra comunque la versione già salvata, invece di restare bloccata in attesa. Aggiunto anche un avviso in alto quando manca connessione, che sparisce automaticamente non appena torna.'] },
