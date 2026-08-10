@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tessere-fedelta-v15';
+const CACHE_NAME = 'tessere-fedelta-v16';
 const urlsToCache = [
   './',
   './index.html',
@@ -37,6 +37,21 @@ self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') {
     return;
   }
+  // Per la pagina principale (navigazione): prova SEMPRE prima la rete, per avere
+  // sempre l'ultima versione quando c'è connessione. La cache serve solo come riserva
+  // quando sei offline. Questo evita di restare bloccati su una versione vecchia
+  // anche se il service worker non si è ancora aggiornato.
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request).then(response => {
+        const responseToCache = response.clone();
+        caches.open(CACHE_NAME).then(cache => cache.put(event.request, responseToCache));
+        return response;
+      }).catch(() => caches.match(event.request).then(r => r || caches.match('./index.html')))
+    );
+    return;
+  }
+  // Per gli altri file (icone, manifest...): cache-first, con aggiornamento in background
   event.respondWith(
     caches.match(event.request).then(response => {
       if (response) {

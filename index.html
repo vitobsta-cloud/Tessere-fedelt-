@@ -316,7 +316,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#eceff1;color:#1a1a1
 <div id="toast"></div>
 
 <script>
-var APP_VERSION = 'v15';
+var APP_VERSION = 'v16';
 var DB_KEY = 'tf_db_v1';
 var MESI = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
 
@@ -1174,6 +1174,7 @@ function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').repla
 
 // ── ABOUT / CRONOLOGIA ──
 var CHANGELOG = [
+  { v:'v16', data:'2026-08-10', voci:['Trovata e corretta la vera causa del "resta bloccato su una versione vecchia": il browser controlla da solo se c\'è un aggiornamento solo ogni tanto (anche una volta al giorno). Ora l\'app forza il controllo subito ad ogni apertura.','Il service worker ora scarica sempre la pagina più recente dalla rete quando c\'è connessione, usando la copia salvata solo quando sei offline — prima faceva il contrario.'] },
   { v:'v15', data:'2026-08-10', voci:['Corretto: su alcuni telefoni (MIUI/Xiaomi in particolare) il menu unico apri-file nascondeva l\'opzione fotocamera. Ora ci sono due pulsanti separati e sempre garantiti: "Scatta foto" e "Dalla galleria".'] },
   { v:'v14', data:'2026-08-10', voci:['Ora si può caricare la foto anche dalla galleria/file già esistenti, non solo scattandola sul momento: il pulsante "Carica foto" apre la scelta tra fotocamera e file.','Il riconoscimento del nome negozio riprova automaticamente fino a 3 volte se non trova nulla al primo tentativo, senza dover ricliccare a mano.','Messaggi del banner ora specifici per ogni fase (ricerca barcode, ricerca nome con numero del tentativo, lettura cifre di riserva) invece del solo testo generico.','L\'OCR sulle cifre parte solo se il codice a barre non viene letto direttamente, risparmiando tempo quando il barcode funziona.'] },
   { v:'v13', data:'2026-08-10', voci:['Nuovo tasto dedicato "Rileva codice a barre": esegue SOLO la lettura diretta del barcode (veloce, senza il peso dell\'OCR completo) con un messaggio specifico sul suo esito.','Il tasto "Rileva anche nome e numero" resta per la scansione completa (barcode + OCR di riserva + nome negozio).','Messaggi del banner più specifici a seconda di quale rilevamento è in corso.'] },
@@ -1211,7 +1212,16 @@ document.getElementById('creditsVersione').textContent = APP_VERSION;
 // Service worker per funzionamento offline
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', function(){
-    navigator.serviceWorker.register('service-worker.js').catch(function(){});
+    navigator.serviceWorker.register('service-worker.js').then(function(reg){
+      // Il browser controlla da solo se c'è una versione nuova solo ogni tanto
+      // (a volte anche una volta al giorno): forziamo il controllo subito ad ogni
+      // apertura dell'app, così un aggiornamento pubblicato viene notato davvero.
+      reg.update();
+      // Ricontrolla anche ogni volta che l'app torna in primo piano
+      document.addEventListener('visibilitychange', function(){
+        if(document.visibilityState === 'visible') reg.update();
+      });
+    }).catch(function(){});
   });
   var swReloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', function(){
