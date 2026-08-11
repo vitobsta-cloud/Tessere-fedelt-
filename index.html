@@ -139,6 +139,10 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#eceff1;color:#1a1a1
 .digicard-barcode svg{width:100%;height:auto;max-height:88px;}
 .digicard-number{font-family:'Courier New',monospace;font-size:21px;font-weight:700;letter-spacing:2.5px;margin-top:8px;color:#1a1a18;word-break:break-all;}
 .digicard-noNum{color:#999;font-size:13px;padding:18px 10px;}
+.digicard-fmt-row{display:flex;align-items:center;justify-content:center;gap:10px;margin-top:10px;flex-wrap:wrap;}
+.digicard-fmt-label{font-size:11.5px;color:#8a8980;}
+.digicard-fmt-btn{background:#f5f4f0;border:1px solid #d3d1c7;border-radius:20px;padding:6px 14px;font-size:12px;font-weight:600;color:#1a1a18;cursor:pointer;font-family:inherit;}
+.digicard-fmt-btn:active{background:#e9e7de;}
 .digicard-copy{margin-top:12px;}
 
 /* Foto originale (collassabile, secondaria) */
@@ -341,7 +345,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#eceff1;color:#1a1a1
 <div id="toast"></div>
 
 <script>
-var APP_VERSION = 'v25';
+var APP_VERSION = 'v27';
 var DB_KEY = 'tf_db_v1';
 var MESI = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
 
@@ -1199,7 +1203,65 @@ function caricaJsBarcode(){
   });
   return _jsbarcodeLoading;
 }
+// Sceglie il formato del codice a barre più adatto al numero salvato, così il
+// disegno delle barre corrisponde a quello reale stampato sulla tessera
+// (es. EAN-13 per i tipici codici numerici a 13 cifre dei supermercati),
+// invece di essere sempre ridisegnato come CODE128 — che è leggibile lo
+// stesso ma visivamente diverso dall'originale (e da app come Klarna, che
+// riconoscono e usano il formato corretto).
+function formatoBarcodeAdatto(numero){
+  var puliti = (numero || '').replace(/\s+/g, '');
+  if(/^\d+$/.test(puliti)){
+    if(puliti.length === 13) return 'EAN13';
+    if(puliti.length === 12) return 'UPC';
+    if(puliti.length === 8) return 'EAN8';
+  }
+  return 'CODE128';
+}
 var _numeroCorrente = '';
+var _forzaCode128 = false; // toggle manuale: usato dal tasto "Cambia formato" nel dettaglio tessera
+function disegnaBarcode(){
+  var numeroPulito = _numeroCorrente.replace(/\s+/g, '');
+  var formatoAuto = formatoBarcodeAdatto(numeroPulito);
+  var formato = _forzaCode128 ? 'CODE128' : formatoAuto;
+  var labelEl = document.getElementById('digicardFmtLabel');
+  function disegnaConCode128(){
+    try{
+      JsBarcode('#digicardSvg', _numeroCorrente, { format:'CODE128', displayValue:false, margin:6, height:70 });
+      if(labelEl) labelEl.textContent = 'Formato: CODE128';
+    }catch(e2){
+      console.error('JsBarcode error (CODE128):', e2);
+      var svgEl2 = document.getElementById('digicardSvg');
+      if(svgEl2) svgEl2.outerHTML = '<div style="font-size:12px;color:#a32d2d;padding:8px 0;">⚠ Impossibile generare il codice a barre da questo numero.</div>';
+    }
+  }
+  try{
+    if(formato === 'CODE128'){
+      disegnaConCode128();
+    } else {
+      JsBarcode('#digicardSvg', numeroPulito, {
+        format: formato,
+        displayValue: false,
+        margin: 6,
+        height: 70,
+        // Se il numero non rispetta davvero questo formato (es. checksum
+        // EAN-13 non valido), ripiega su CODE128 invece di lasciare lo
+        // spazio vuoto o generare un errore.
+        valid: function(valida){ if(!valida) disegnaConCode128(); else if(labelEl) labelEl.textContent = 'Formato: ' + formato; }
+      });
+    }
+  }catch(e){
+    console.error('JsBarcode error:', e);
+    disegnaConCode128();
+  }
+}
+// Tasto "Cambia formato": utile alla cassa se un lettore non riconosce il
+// formato mostrato (es. scanner tarato solo su EAN-13, o viceversa) — passa
+// istantaneamente all'altro formato senza dover modificare la tessera.
+function cambiaFormatoBarcode(){
+  _forzaCode128 = !_forzaCode128;
+  disegnaBarcode();
+}
 function apriDettaglio(id){
   currentDettaglioId = id;
   var t = db().find(function(x){ return x.id === id; });
@@ -1214,19 +1276,21 @@ function apriDettaglio(id){
   document.getElementById('detNote').style.display = t.note ? 'block' : 'none';
 
   _numeroCorrente = (t.numero || '').trim();
+  _forzaCode128 = false;
   var bcWrap = document.getElementById('digicardBarcodeWrap');
   var copyWrap = document.getElementById('digicardCopyWrap');
   if(_numeroCorrente){
-    bcWrap.innerHTML = '<div class="digicard-barcode"><svg id="digicardSvg"></svg></div><div class="digicard-number">'+esc(formattaNumero(_numeroCorrente))+'</div>';
+    var formatoAutoIniziale = formatoBarcodeAdatto(_numeroCorrente.replace(/\s+/g, ''));
+    var mostraTasto = formatoAutoIniziale !== 'CODE128'; // ha senso alternare solo se esiste un formato diverso da provare
+    bcWrap.innerHTML = '<div class="digicard-barcode"><svg id="digicardSvg"></svg></div>' +
+      '<div class="digicard-number">'+esc(formattaNumero(_numeroCorrente))+'</div>' +
+      '<div class="digicard-fmt-row">' +
+        '<span class="digicard-fmt-label" id="digicardFmtLabel">Formato: '+esc(formatoAutoIniziale)+'</span>' +
+        (mostraTasto ? '<button type="button" class="digicard-fmt-btn" onclick="cambiaFormatoBarcode()">🔁 Cambia formato</button>' : '') +
+      '</div>';
     copyWrap.style.display = 'block';
     caricaJsBarcode().then(function(){
-      try{
-        JsBarcode('#digicardSvg', _numeroCorrente, { format:'CODE128', displayValue:false, margin:6, height:70 });
-      }catch(e){
-        console.error('JsBarcode error:', e);
-        var svgEl = document.getElementById('digicardSvg');
-        if(svgEl) svgEl.outerHTML = '<div style="font-size:12px;color:#a32d2d;padding:8px 0;">⚠ Impossibile generare il codice a barre da questo numero.</div>';
-      }
+      disegnaBarcode();
     }).catch(function(err){
       console.error('JsBarcode load error:', err);
       var svgEl = document.getElementById('digicardSvg');
@@ -1394,6 +1458,8 @@ function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').repla
 
 // ── ABOUT / CRONOLOGIA ──
 var CHANGELOG = [
+  { v:'v27', data:'2026-08-11', voci:['Aggiunto un tasto "🔁 Cambia formato" sotto il codice a barre nel dettaglio tessera: se alla cassa il lettore non riconosce il formato mostrato (es. EAN-13), con un tocco si passa istantaneamente a CODE128 (e viceversa), senza dover modificare la tessera. Il tasto compare solo quando ha senso, cioè quando esiste davvero un formato alternativo da provare. Sotto il codice a barre è indicato anche il formato in uso al momento.'] },
+  { v:'v26', data:'2026-08-11', voci:['Corretto il formato del codice a barre mostrato alla cassa: prima veniva sempre disegnato come CODE128, anche quando il numero era in realtà un EAN-13 (i tipici 13 numeri dei supermercati) — risultando visivamente diverso dall\'originale stampato sulla tessera (e da come lo mostrano app come Klarna). Ora l\'app riconosce il formato giusto in base alla lunghezza del numero (EAN-13 a 13 cifre, EAN-8 a 8, UPC a 12) e usa CODE128 solo quando serve davvero, con un controllo automatico di sicurezza: se il numero non rispetta il formato ipotizzato, ripiega comunque su CODE128 invece di lasciare il codice a barre vuoto.'] },
   { v:'v25', data:'2026-08-11', voci:['Integrato il tasto/gesto Indietro di Android con la navigazione dell\'app: ora premerlo torna alla schermata precedente esattamente come il tasto "Indietro" in alto, invece di uscire subito dall\'app. I due sono sincronizzati tra loro tramite la cronologia del browser (History API): un passo alla volta, in entrambi i casi.'] },
   { v:'v24', data:'2026-08-10', voci:['La scelta dell\'icona tessera non è più una griglia di riquadri: ora è un menù a tendina (elenco a scorrimento) dove l\'icona proposta di default resta quella rilevata automaticamente dal nome negozio, e si può cambiare scorrendo tutte le icone disponibili, con meno spazio occupato nel form.'] },
   { v:'v23', data:'2026-08-10', voci:['Corretto: l\'apertura ora è VERAMENTE offline-first — nella v22 la cache veniva mostrata subito ma il tentativo di rete partiva comunque nello stesso istante, in parallelo. Ora il primo tentativo di rete (sia per il controllo aggiornamenti dell\'app, sia per il banner di stato connessione) parte solo 2,5 secondi DOPO l\'apertura, mai insieme: prima si vede sempre e solo la versione offline già in cache.'] },
