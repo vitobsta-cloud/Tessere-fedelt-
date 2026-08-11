@@ -352,7 +352,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#eceff1;color:#1a1a1
 <div id="toast"></div>
 
 <script>
-var APP_VERSION = 'v28';
+var APP_VERSION = 'v29';
 var DB_KEY = 'tf_db_v1';
 var MESI = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
 
@@ -641,7 +641,7 @@ function aggiornaHome() {
   var tot = db().length;
   document.getElementById('homeSum').innerHTML = tot === 0
     ? 'Nessuna tessera salvata ancora'
-    : '<b>'+tot+'</b> tessera'+(tot===1?'':'e')+' salvata'+(tot===1?'':'e');
+    : '<b>'+tot+'</b> ' + (tot === 1 ? 'tessera salvata' : 'tessere salvate');
 }
 
 // ── FORM INSERISCI ──
@@ -1378,7 +1378,8 @@ function eliminaTessera(){
 // ── IMPOSTAZIONI ──
 function initImpostazioni(){
   var d = db();
-  document.getElementById('infoCount').textContent = d.length + ' tessera' + (d.length===1?'':'e') + ' salvata' + (d.length===1?'':'e');
+  var n = d.length;
+  document.getElementById('infoCount').textContent = n + (n === 1 ? ' tessera salvata' : ' tessere salvate');
   document.getElementById('infoVersione').textContent = 'Versione ' + APP_VERSION;
   document.getElementById('creditsVersione').textContent = APP_VERSION;
 }
@@ -1467,6 +1468,7 @@ function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').repla
 
 // ── ABOUT / CRONOLOGIA ──
 var CHANGELOG = [
+  { v:'v29', data:'2026-08-11', voci:['Corretto un bug di pluralizzazione: con più di una tessera, sia in Home sia in Impostazioni compariva "tesserae salvatae" (per errore, concatenando "tessera"+"e" invece di scrivere "tessere") — ora mostra correttamente "N tessere salvate" (o "1 tessera salvata" al singolare).'] },
   { v:'v28', data:'2026-08-11', voci:['Spostati "Formato / Cambia formato" e "Copia numero" fuori dal riquadro della tessera: prima erano dentro, rendendola inutilmente più ingombrante e meno pulita da mostrare alla cassa. Ora la tessera contiene solo intestazione, codice a barre e numero — i controlli stanno subito sotto, fuori dal riquadro.'] },
   { v:'v27', data:'2026-08-11', voci:['Aggiunto un tasto "🔁 Cambia formato" sotto il codice a barre nel dettaglio tessera: se alla cassa il lettore non riconosce il formato mostrato (es. EAN-13), con un tocco si passa istantaneamente a CODE128 (e viceversa), senza dover modificare la tessera. Il tasto compare solo quando ha senso, cioè quando esiste davvero un formato alternativo da provare. Sotto il codice a barre è indicato anche il formato in uso al momento.'] },
   { v:'v26', data:'2026-08-11', voci:['Corretto il formato del codice a barre mostrato alla cassa: prima veniva sempre disegnato come CODE128, anche quando il numero era in realtà un EAN-13 (i tipici 13 numeri dei supermercati) — risultando visivamente diverso dall\'originale stampato sulla tessera (e da come lo mostrano app come Klarna). Ora l\'app riconosce il formato giusto in base alla lunghezza del numero (EAN-13 a 13 cifre, EAN-8 a 8, UPC a 12) e usa CODE128 solo quando serve davvero, con un controllo automatico di sicurezza: se il numero non rispetta il formato ipotizzato, ripiega comunque su CODE128 invece di lasciare il codice a barre vuoto.'] },
