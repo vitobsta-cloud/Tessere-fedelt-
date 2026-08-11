@@ -341,7 +341,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#eceff1;color:#1a1a1
 <div id="toast"></div>
 
 <script>
-var APP_VERSION = 'v24';
+var APP_VERSION = 'v25';
 var DB_KEY = 'tf_db_v1';
 var MESI = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
 
@@ -575,7 +575,13 @@ function vai(name, skipStack) {
   if(!skipStack) {
     var current = '';
     Object.keys(SCREENS).forEach(function(k){ if(document.getElementById(SCREENS[k]).classList.contains('on')) current = k; });
-    if(current && current !== name) navStack.push(current);
+    if(current && current !== name) {
+      navStack.push(current);
+      // Ogni passaggio "in avanti" viene registrato anche nella cronologia del
+      // browser: così il tasto/gesto Indietro di Android, oltre a quello
+      // dell'app, sa sempre qual è la schermata precedente da mostrare.
+      try{ history.pushState({tfScreen: name}, '', location.href); }catch(e){}
+    }
     if(navStack.length > 10) navStack.shift();
   }
   Object.keys(SCREENS).forEach(function(k){ document.getElementById(SCREENS[k]).classList.remove('on'); });
@@ -589,7 +595,11 @@ function vai(name, skipStack) {
   if(name === 'tessere') renderTessere();
   if(name === 'impostazioni') initImpostazioni();
 }
-function goBack() {
+// Esegue davvero il passo indietro (aggiorna navStack e mostra la schermata
+// precedente). Sia il tasto "Indietro" dell'app sia il tasto/gesto Indietro
+// di Android finiscono per chiamare questa stessa funzione, tramite l'evento
+// "popstate": così restano sempre sincronizzati, un passo alla volta.
+function eseguiBackInterno() {
   editingId = null;
   if(navStack.length > 0) {
     var prev = navStack.pop();
@@ -598,8 +608,19 @@ function goBack() {
     vai('home', true);
   }
 }
+// Tasto "Indietro" dell'app: invece di cambiare schermata direttamente,
+// richiama lo stesso back del browser usato dal tasto/gesto Android, così i
+// due sono perfettamente equivalenti e non si desincronizzano mai.
+function goBack() {
+  try{ history.back(); }catch(e){ eseguiBackInterno(); }
+}
 function goHome() { navStack = []; editingId = null; vai('home', true); }
 
+// Intercetta il tasto/gesto Indietro di Android (e quello del browser):
+// invece di uscire subito dall'app, torna alla schermata precedente esattamente
+// come farebbe il tasto "Indietro" in alto — solo quando si è già sulla Home
+// il passo successivo chiude davvero l'app, come ci si aspetta normalmente.
+window.addEventListener('popstate', function(){ eseguiBackInterno(); });
 // ── HOME ──
 function aggiornaHome() {
   var now = new Date();
@@ -676,6 +697,10 @@ document.addEventListener('DOMContentLoaded', function(){
   STORE_LIST.forEach(function(s){ var o=document.createElement('option'); o.value=s.n; dl.appendChild(o); });
   renderFotoSlot('fronte');
   renderFotoSlot('retro');
+  // Stato iniziale della cronologia (schermata Home): serve come base da cui
+  // partono i pushState delle schermate successive, per il tasto/gesto
+  // Indietro di Android.
+  try{ history.replaceState({tfScreen:'home'}, '', location.href); }catch(e){}
 });
 
 // ── FOTO FRONTE/RETRO ──
@@ -1124,6 +1149,10 @@ function salvaTessera(){
   resetForm();
   vai('tessere', true);
   navStack = ['home'];
+  // Manteniamo in sincronia anche la cronologia del browser (skipStack=true
+  // sopra non l'ha già fatto): un solo passo indietro da qui deve riportare
+  // alla Home, sia con il tasto dell'app sia con quello/gesto Android.
+  try{ history.pushState({tfScreen:'tessere'}, '', location.href); }catch(e){}
 }
 
 // ── LE MIE TESSERE (griglia stile Klarna) ──
@@ -1365,6 +1394,7 @@ function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').repla
 
 // ── ABOUT / CRONOLOGIA ──
 var CHANGELOG = [
+  { v:'v25', data:'2026-08-11', voci:['Integrato il tasto/gesto Indietro di Android con la navigazione dell\'app: ora premerlo torna alla schermata precedente esattamente come il tasto "Indietro" in alto, invece di uscire subito dall\'app. I due sono sincronizzati tra loro tramite la cronologia del browser (History API): un passo alla volta, in entrambi i casi.'] },
   { v:'v24', data:'2026-08-10', voci:['La scelta dell\'icona tessera non è più una griglia di riquadri: ora è un menù a tendina (elenco a scorrimento) dove l\'icona proposta di default resta quella rilevata automaticamente dal nome negozio, e si può cambiare scorrendo tutte le icone disponibili, con meno spazio occupato nel form.'] },
   { v:'v23', data:'2026-08-10', voci:['Corretto: l\'apertura ora è VERAMENTE offline-first — nella v22 la cache veniva mostrata subito ma il tentativo di rete partiva comunque nello stesso istante, in parallelo. Ora il primo tentativo di rete (sia per il controllo aggiornamenti dell\'app, sia per il banner di stato connessione) parte solo 2,5 secondi DOPO l\'apertura, mai insieme: prima si vede sempre e solo la versione offline già in cache.'] },
   { v:'v22', data:'2026-08-10', voci:['Cambiata la strategia del service worker: la pagina principale ora viene sempre servita PRIMA dalla cache (se presente), invece di aspettare la rete anche solo per una frazione di secondo — apertura istantanea in ogni condizione, fondamentale alla cassa. In parallelo, in background, l\'app scarica comunque la versione più recente per farla trovare pronta alla prossima apertura. Solo la primissima apertura in assoluto (prima ancora che ci sia qualcosa in cache) richiede la rete.'] },

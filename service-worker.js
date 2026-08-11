@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tessere-fedelta-v24';
+const CACHE_NAME = 'tessere-fedelta-v25';
 const urlsToCache = [
   './',
   './index.html',
